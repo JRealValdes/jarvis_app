@@ -16,11 +16,11 @@ class AuthService {
       return false;
     }
 
+    print('🔑 Intentando iniciar sesión con usuario: $username');
+    print('🔐 Intentando iniciar sesión con contraseña: $password');
     final uri = Uri.parse('$baseUrl/token');
     final basicAuth = 'Basic ' + base64Encode(utf8.encode('$username:$password'));
     print('🌐 URI final: $uri');
-    print('🔑 Intentando iniciar sesión con usuario: $username');
-    print('🔐 Intentando iniciar sesión con contraseña: $password');
     print('🔑 Auth header: $basicAuth');
 
     final response = await http.post(

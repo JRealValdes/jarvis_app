@@ -25,9 +25,27 @@ class ApiService {
       },
       body: json.encode(body),
     );
-    if (response.statusCode == 404) {
-      await init(); // reload baseUrl
-      return postAsk(body); // retry
+    if (response.statusCode == 404 || response.statusCode == 1016) {
+      await init();
+      return postAsk(body);
+    }
+    return response;
+  }
+
+  Future<http.Response> resetMemory() async {
+    await _ensureBaseUrl();
+    final token = await _auth.getToken();
+    final uri = Uri.parse('$_baseUrl/reset');
+    final response = await http.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+    if (response.statusCode == 404 || response.statusCode == 1016) {
+      await init();
+      return resetMemory();
     }
     return response;
   }

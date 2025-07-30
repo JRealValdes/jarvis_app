@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../config.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,21 +15,27 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _controller = TextEditingController();
   final List<ChatMessage> _messages = [];
 
+  String? _threadId;
+
   void _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
 
-    // Agrega el mensaje del usuario
     setState(() {
       _messages.add(ChatMessage(text: text, isUser: true));
     });
 
     _controller.clear();
 
+    _threadId ??= DateTime.now().millisecondsSinceEpoch.toString();
+
+    print('Enviando mensaje: $text');
+    print('Thread ID: $_threadId');
+
     final resp = await _api.postAsk({
       'message': text,
-      'model_name': 'GPT_3_5',
-      'thread_id': 'test',
+      'model_name': Config.modelName,
+      'thread_id': _threadId!,
     });
 
     if (resp.statusCode == 200) {
@@ -47,10 +54,37 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _resetChat() async {
+    final response = await _api.resetMemory();
+
+    if (!mounted) return;  // <-- importante, justo tras el await
+
+    if (response.statusCode == 200) {
+      setState(() {
+        _messages.clear();
+        _threadId = null;
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al resetear: ${response.statusCode}')),
+      );
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Jarvis')),
+      appBar: AppBar(
+        title: Text('Jarvis'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.refresh),
+            tooltip: 'Resetear chat',
+            onPressed: _resetChat,
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
