@@ -1,27 +1,34 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
+import '../services/storage_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  LoginScreenState createState() => LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class LoginScreenState extends State<LoginScreen> {
   final _userCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final AuthService _auth = AuthService();
 
   void _onLogin() async {
     final ok = await _auth.login(_userCtrl.text, _passCtrl.text);
+
     if (ok) {
+      final threadId = await StorageService.getThreadId();
+
+      if (!mounted) return;
+
       Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => HomeScreen()),
-    );
+        context,
+        MaterialPageRoute(builder: (_) => HomeScreen(threadId: threadId)),
+      );
     } else {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Login failed')));
     }
   }

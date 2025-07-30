@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'firebase_service.dart'; // <-- importa esto
+import 'firebase_service.dart';
 
 class AuthService {
   final _storage = FlutterSecureStorage();
@@ -44,12 +44,40 @@ class AuthService {
     return false;
   }
 
-
   Future<String?> getToken() async {
     return await _storage.read(key: 'jwt_token');
   }
 
-  Future<void> logout() async {
+  Future<void> saveToken(String token) async {
+    await _storage.write(key: 'jwt_token', value: token);
+  }
+
+  Future<void> deleteToken() async {
     await _storage.delete(key: 'jwt_token');
+  }
+
+  Future<bool> validateToken() async {
+    final baseUrl = await _firebase.fetchApiBaseUrl();
+    if (baseUrl == null) return false;
+    final token = await getToken();
+    if (token == null) return false;
+
+    final uri = Uri.parse('$baseUrl/ask');
+    final response = await http.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: json.encode({'message': 'ping', 'model_name': 'GPT_3_5', 'thread_id': 'ping_thread'}),
+    );
+
+    // Si responde 200 es válido, si 401 u otro, inválido
+    return response.statusCode == 200;
+  }
+
+  Future<void> logout() async {
+    await deleteToken();
   }
 }

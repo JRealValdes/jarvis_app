@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'services/firebase_service.dart';
+import 'services/auth_service.dart';
+import 'services/storage_service.dart';
 import 'screens/login_screen.dart';
+import 'screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -8,15 +11,47 @@ void main() async {
   runApp(JarvisApp());
 }
 
-// This widget is the root of your application.
-class JarvisApp extends StatelessWidget {
+class JarvisApp extends StatefulWidget {
   const JarvisApp({super.key});
+
+  @override
+  State<JarvisApp> createState() => _JarvisAppState();
+}
+
+class _JarvisAppState extends State<JarvisApp> {
+  final AuthService _auth = AuthService();
+
+  Widget _defaultHome = const LoginScreen();
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuth();
+  }
+
+  Future<void> _checkAuth() async {
+    final valid = await _auth.validateToken();
+    if (valid) {
+      final threadId = await StorageService.getThreadId();
+      // Navegar a home con threadId guardado (o null)
+      setState(() {
+        _defaultHome = HomeScreen(threadId: threadId);
+      });
+    } else {
+      // Borrar token y threadId guardados para limpiar estado
+      await _auth.logout();
+      await StorageService.deleteThreadId();
+      setState(() {
+        _defaultHome = const LoginScreen();
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Jarvis App',
-      home: LoginScreen(),
+      home: _defaultHome,
     );
   }
 }

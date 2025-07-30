@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/storage_service.dart';
 import '../config.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final String? threadId;
+  const HomeScreen({super.key, this.threadId});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -17,6 +19,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String? _threadId;
 
+  @override
+  void initState() {
+    super.initState();
+    _threadId = widget.threadId;
+  }
+
   void _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
@@ -27,7 +35,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _controller.clear();
 
+    // If there's no threadId, create a new one and save it
     _threadId ??= DateTime.now().millisecondsSinceEpoch.toString();
+    await StorageService.saveThreadId(_threadId!);
 
     print('Enviando mensaje: $text');
     print('Thread ID: $_threadId');
@@ -57,13 +67,14 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _resetChat() async {
     final response = await _api.resetMemory();
 
-    if (!mounted) return;  // <-- importante, justo tras el await
+    if (!mounted) return;
 
     if (response.statusCode == 200) {
       setState(() {
         _messages.clear();
         _threadId = null;
       });
+      await StorageService.deleteThreadId();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error al resetear: ${response.statusCode}')),
