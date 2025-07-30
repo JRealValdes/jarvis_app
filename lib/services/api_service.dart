@@ -19,7 +19,8 @@ class ApiService {
     final response = await http.post(
       uri,
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json',
         'Authorization': 'Bearer $token',
       },
       body: json.encode(body),
