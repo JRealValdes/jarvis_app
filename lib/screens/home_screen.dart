@@ -4,6 +4,8 @@ import '../services/api_service.dart';
 class HomeScreen extends StatelessWidget {
   final ApiService _api = ApiService();
 
+  HomeScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -13,7 +15,7 @@ class HomeScreen extends StatelessWidget {
           onPressed: () async {
             final resp = await _api.postAsk({
               'message': 'Hola',
-              'model_name': 'GPT',
+              'model_name': 'GPT_3_5',
               'thread_id': 'test'
             });
             final data = resp.statusCode == 200 ? resp.body : 'Error: \${resp.statusCode}';

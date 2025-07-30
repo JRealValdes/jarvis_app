@@ -3,6 +3,8 @@ import '../services/auth_service.dart';
 import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
   @override
   _LoginScreenState createState() => _LoginScreenState();
 }
@@ -14,11 +16,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _onLogin() async {
     final ok = await _auth.login(_userCtrl.text, _passCtrl.text);
-    if (ok) Navigator.pushReplacement(
+    if (ok) {
+      Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => HomeScreen()),
     );
-    else ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Login failed')));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Login failed')));
+    }
   }
 
   @override

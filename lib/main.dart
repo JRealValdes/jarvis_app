@@ -10,6 +10,8 @@ void main() async {
 
 // This widget is the root of your application.
 class JarvisApp extends StatelessWidget {
+  const JarvisApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
