@@ -10,7 +10,7 @@ https://console.firebase.google.com/u/0/project
 ## Roadmap
 - [x] Basic app
 - [x] Reset chat button
-- [ ] Persistent login
+- [x] Persistent login
 - [ ] Individual chat-reset option
 - [ ] Admin will have 2 reset buttons: individual and global
 - [ ] User identification through first login. According username as thread-id

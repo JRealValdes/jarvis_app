@@ -116,7 +116,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Jarvis'),
+        title: Text('J.A.R.V.I.S.'),
         actions: [
           IconButton(
             icon: Icon(Icons.refresh),
