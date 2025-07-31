@@ -17,6 +17,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final ApiService _api = ApiService();
   final TextEditingController _controller = TextEditingController();
   final List<ChatMessage> _messages = [];
+  final ScrollController _scrollController = ScrollController();
 
   String? _threadId;
 
@@ -26,12 +27,25 @@ class _HomeScreenState extends State<HomeScreen> {
     _threadId = widget.threadId;
   }
 
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   void _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
 
     setState(() {
       _messages.add(ChatMessage(text: text, isUser: true));
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
     });
 
     _controller.clear();
@@ -56,11 +70,25 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         for (var msg in responses) {
           _messages.add(ChatMessage(text: msg, isUser: false));
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _scrollController.animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+            );
+          });
         }
       });
     } else {
       setState(() {
         _messages.add(ChatMessage(text: 'Error: ${resp.statusCode}', isUser: false));
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
       });
     }
   }
@@ -101,6 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Expanded(
             child: ListView.builder(
+              controller: _scrollController,
               padding: EdgeInsets.all(8),
               itemCount: _messages.length,
               itemBuilder: (context, index) => _messages[index],
@@ -114,8 +143,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: TextField(
                     controller: _controller,
                     textCapitalization: TextCapitalization.sentences,
+                    keyboardType: TextInputType.multiline,
+                    maxLines: null,
                     decoration: InputDecoration(hintText: 'Escribe un mensaje...'),
-                    onSubmitted: (_) => _sendMessage(),
                   ),
                 ),
                 IconButton(
@@ -149,7 +179,7 @@ class ChatMessage extends StatelessWidget {
         ),
         padding: const EdgeInsets.all(10),
         child: isUser
-            ? Text(text) // el usuario no usa Markdown, normalmente
+            ? Text(text)
             : MarkdownBody(
                 data: text,
                 styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
