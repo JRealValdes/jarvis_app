@@ -1,13 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import '../services/storage_service.dart';
 import '../config.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 class HomeScreen extends StatefulWidget {
-  final String? threadId;
-  const HomeScreen({super.key, this.threadId});
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -19,12 +17,15 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<ChatMessage> _messages = [];
   final ScrollController _scrollController = ScrollController();
 
-  String? _threadId;
-
   @override
   void initState() {
     super.initState();
-    _threadId = widget.threadId;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_messages.isEmpty) {
+        _sendMessage(initial: true);
+      }
+    });
   }
 
   @override
@@ -33,34 +34,27 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _sendMessage() async {
-    final text = _controller.text.trim();
+  void _sendMessage({bool initial = false}) async {
+    final text = initial ? "Hola" : _controller.text.trim();
     if (text.isEmpty) return;
 
-    setState(() {
-      _messages.add(ChatMessage(text: text, isUser: true));
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    });
-
-    _controller.clear();
-
-    // If there's no threadId, create a new one and save it
-    _threadId ??= DateTime.now().millisecondsSinceEpoch.toString();
-    await StorageService.saveThreadId(_threadId!);
-
-    print('Enviando mensaje: $text');
-    print('Thread ID: $_threadId');
+    if (!initial) {
+      setState(() {
+        _messages.add(ChatMessage(text: text, isUser: true));
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      });
+      _controller.clear();
+    }
 
     final resp = await _api.postAsk({
       'message': text,
       'model_name': Config.modelName,
-      'thread_id': _threadId!,
     });
 
     if (resp.statusCode == 200) {
@@ -83,13 +77,6 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _messages.add(ChatMessage(text: 'Error: ${resp.statusCode}', isUser: false));
       });
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      });
     }
   }
 
@@ -101,16 +88,14 @@ class _HomeScreenState extends State<HomeScreen> {
     if (response.statusCode == 200) {
       setState(() {
         _messages.clear();
-        _threadId = null;
       });
-      await StorageService.deleteThreadId();
+      _sendMessage(initial: true);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error al resetear: ${response.statusCode}')),
       );
     }
   }
-
 
   @override
   Widget build(BuildContext context) {

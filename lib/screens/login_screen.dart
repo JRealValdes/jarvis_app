@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
-import '../services/storage_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -19,13 +18,11 @@ class LoginScreenState extends State<LoginScreen> {
     final ok = await _auth.login(_userCtrl.text, _passCtrl.text);
 
     if (ok) {
-      final threadId = await StorageService.getThreadId();
-
       if (!mounted) return;
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => HomeScreen(threadId: threadId)),
+        MaterialPageRoute(builder: (_) => HomeScreen()),
       );
     } else {
       if (!mounted) return;

@@ -19,7 +19,7 @@ class AuthService {
     print('🔑 Intentando iniciar sesión con usuario: $username');
     print('🔐 Intentando iniciar sesión con contraseña: $password');
     final uri = Uri.parse('$baseUrl/token');
-    final basicAuth = 'Basic ' + base64Encode(utf8.encode('$username:$password'));
+    final basicAuth = 'Basic ${base64Encode(utf8.encode('$username:$password'))}';
     print('🌐 URI final: $uri');
     print('🔑 Auth header: $basicAuth');
 

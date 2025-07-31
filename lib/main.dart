@@ -32,10 +32,9 @@ class _JarvisAppState extends State<JarvisApp> {
   Future<void> _checkAuth() async {
     final valid = await _auth.validateToken();
     if (valid) {
-      final threadId = await StorageService.getThreadId();
       // Navegar a home con threadId guardado (o null)
       setState(() {
-        _defaultHome = HomeScreen(threadId: threadId);
+        _defaultHome = HomeScreen();
       });
     } else {
       // Borrar token y threadId guardados para limpiar estado
