@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../config.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? threadId;
@@ -140,14 +141,25 @@ class ChatMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      padding: EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
       child: Container(
         decoration: BoxDecoration(
           color: isUser ? Colors.blue[100] : Colors.grey[300],
           borderRadius: BorderRadius.circular(12),
         ),
-        padding: EdgeInsets.all(10),
-        child: Text(text),
+        padding: const EdgeInsets.all(10),
+        child: isUser
+            ? Text(text) // el usuario no usa Markdown, normalmente
+            : MarkdownBody(
+                data: text,
+                styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                  p: Theme.of(context).textTheme.bodyMedium,
+                  strong: const TextStyle(fontWeight: FontWeight.bold),
+                  h1: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  h2: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  h3: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
       ),
     );
   }
