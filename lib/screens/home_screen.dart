@@ -112,6 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
+                    textCapitalization: TextCapitalization.sentences,
                     decoration: InputDecoration(hintText: 'Escribe un mensaje...'),
                     onSubmitted: (_) => _sendMessage(),
                   ),
