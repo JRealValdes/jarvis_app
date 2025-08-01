@@ -28,10 +28,11 @@ class _SessionManagerScreenState extends State<SessionManagerScreen> {
     if (resp.statusCode == 200) {
       final data = jsonDecode(resp.body);
       _validModels = List<String>.from(data['agent_models'] ?? []);
-      _sessions = List<String>.from(data['sessions'] ?? [])
-          .map((s) => s.replaceAll("('", '').replaceAll("')", '').split(", "))
-          .map((list) => (list[0], list[1].replaceAll("'", "")))
-          .toList();
+      _sessions = List<String>.from(data['sessions'] ?? []).map((s) {
+        final cleaned = s.replaceAll(RegExp(r"[()']"), "");
+        final parts = cleaned.split(", ");
+        return (parts[0], parts[1]);
+      }).toList();
     }
     setState(() => _loading = false);
   }
@@ -82,6 +83,7 @@ class _SessionManagerScreenState extends State<SessionManagerScreen> {
                     itemCount: _sessions.length,
                     itemBuilder: (context, index) {
                       final (model, threadId) = _sessions[index];
+                      print('🔍 Sesión: $model, ID: $threadId, Valid models: $_validModels');
                       final isValid = _validModels.contains(model);
                       return Container(
                         color: isValid ? null : Colors.red[100],
