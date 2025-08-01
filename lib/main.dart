@@ -3,7 +3,7 @@ import 'services/firebase_service.dart';
 import 'services/auth_service.dart';
 import 'services/storage_service.dart';
 import 'screens/login_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/chat_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,7 +34,7 @@ class _JarvisAppState extends State<JarvisApp> {
     if (valid) {
       // Navegar a home con threadId guardado (o null)
       setState(() {
-        _defaultHome = HomeScreen();
+        _defaultHome = ChatScreen();
       });
     } else {
       // Borrar token y threadId guardados para limpiar estado
