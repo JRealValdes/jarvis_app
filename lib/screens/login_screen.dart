@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../services/auth_service.dart';
 import 'chat_screen.dart';
+import 'session_manager_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -40,21 +41,28 @@ class LoginScreenState extends State<LoginScreen> {
       await _storage.write(key: 'username', value: username);
       await _storage.write(key: 'password', value: password);
 
+      final isAdmin = await _auth.isAdmin();
+
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => ChatScreen()),
+        MaterialPageRoute(
+          builder: (_) => isAdmin ? SessionManagerScreen() : ChatScreen(),
+        ),
       );
     } else {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Login failed')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Login failed')),
+      );
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Login to J.A.R.V.I.S. - v1.0.2')),
+      appBar: AppBar(title: const Text('Login to J.A.R.V.I.S. - v1.1.0')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: AutofillGroup(

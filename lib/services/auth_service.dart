@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'firebase_service.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
 
 class AuthService {
   final _storage = FlutterSecureStorage();
@@ -70,14 +71,32 @@ class AuthService {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      body: json.encode({'message': 'ping', 'model_name': 'GPT_3_5', 'thread_id': 'ping_thread'}),
+      body: json.encode({'message': 'ping', 'model_name': 'GPT_3_5'}),
     );
 
     // Si responde 200 es válido, si 401 u otro, inválido
     return response.statusCode == 200;
   }
 
+  Future<Map<String, dynamic>?> getTokenData() async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    try {
+      return JwtDecoder.decode(token);
+    } catch (e) {
+      print("❌ Error al decodificar JWT: $e");
+      return null;
+    }
+  }
+
   Future<void> logout() async {
     await deleteToken();
+  }
+
+  Future<bool> isAdmin() async {
+    final tokenData = await getTokenData();
+    print('🔍 Datos del token: $tokenData');
+    return tokenData?['admin'] == 1;
   }
 }

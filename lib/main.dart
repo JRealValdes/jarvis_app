@@ -4,6 +4,7 @@ import 'services/auth_service.dart';
 import 'services/storage_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/chat_screen.dart';
+import 'screens/session_manager_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,12 +33,12 @@ class _JarvisAppState extends State<JarvisApp> {
   Future<void> _checkAuth() async {
     final valid = await _auth.validateToken();
     if (valid) {
-      // Navegar a home con threadId guardado (o null)
+      final isAdmin = await _auth.isAdmin();
+      print('User is admin: $isAdmin');
       setState(() {
-        _defaultHome = ChatScreen();
+        _defaultHome = isAdmin ? SessionManagerScreen() : ChatScreen();
       });
     } else {
-      // Borrar token y threadId guardados para limpiar estado
       await _auth.logout();
       await StorageService.deleteThreadId();
       setState(() {

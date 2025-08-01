@@ -5,6 +5,8 @@ import '../config.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'login_screen.dart';
+import 'session_manager_screen.dart';
+import '../services/auth_service.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -19,12 +21,19 @@ class _ChatScreenState extends State<ChatScreen> {
   final FocusNode _focusNode = FocusNode();
   final List<ChatMessage> _messages = [];
   final ScrollController _scrollController = ScrollController();
+  bool _isAdmin = false;
 
   bool _wasAtBottom = true;
 
   @override
   void initState() {
     super.initState();
+
+    AuthService().isAdmin().then((value) {
+      setState(() {
+        _isAdmin = value;
+      });
+    });
 
     // Detectar si estaba abajo al hacer scroll
     _scrollController.addListener(() {
@@ -46,9 +55,24 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     });
 
-    // Mensaje inicial
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_messages.isEmpty) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final resp = await _api.getMessageHistory();
+      if (resp.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
+        final history = decoded['messages'] as List<dynamic>;
+
+        if (history.isNotEmpty) {
+          setState(() {
+            for (var msg in history) {
+              if (msg['role'] == 'system') continue;
+              final isUser = msg['role'] == 'user';
+              _messages.add(ChatMessage(text: msg['content'], isUser: isUser));
+            }
+          });
+        } else {
+          _sendMessage(initial: true);
+        }
+      } else {
         _sendMessage(initial: true);
       }
     });
@@ -108,7 +132,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _resetChat() async {
-    final response = await _api.resetMemory();
+    final response = await _api.resetSession();
 
     if (!mounted) return;
 
@@ -142,6 +166,17 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         title: const Text('J.A.R.V.I.S.'),
         actions: [
+          if (_isAdmin)
+            IconButton(
+              icon: const Icon(Icons.settings),
+              tooltip: 'Session Manager',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SessionManagerScreen()),
+                );
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Resetear chat',
