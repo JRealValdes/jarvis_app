@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
 
@@ -12,14 +13,34 @@ class LoginScreen extends StatefulWidget {
 class LoginScreenState extends State<LoginScreen> {
   final _userCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+  final _storage = const FlutterSecureStorage();
   final AuthService _auth = AuthService();
 
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
+  void _loadSavedCredentials() async {
+    final savedUser = await _storage.read(key: 'username');
+    final savedPass = await _storage.read(key: 'password');
+
+    if (savedUser != null) _userCtrl.text = savedUser;
+    if (savedPass != null) _passCtrl.text = savedPass;
+  }
+
   void _onLogin() async {
-    final ok = await _auth.login(_userCtrl.text, _passCtrl.text);
+    final username = _userCtrl.text;
+    final password = _passCtrl.text;
+
+    final ok = await _auth.login(username, password);
 
     if (ok) {
-      if (!mounted) return;
+      await _storage.write(key: 'username', value: username);
+      await _storage.write(key: 'password', value: password);
 
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => HomeScreen()),
@@ -33,15 +54,29 @@ class LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Login to J.A.R.V.I.S. - v1.0.1')),
+      appBar: AppBar(title: const Text('Login to J.A.R.V.I.S. - v1.0.2')),
       body: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(controller: _userCtrl, decoration: InputDecoration(labelText: 'User')),
-            TextField(controller: _passCtrl, decoration: InputDecoration(labelText: 'Pass'), obscureText: true),
-            ElevatedButton(onPressed: _onLogin, child: Text('Login'))
-          ],
+        padding: const EdgeInsets.all(16),
+        child: AutofillGroup(
+          child: Column(
+            children: [
+              TextField(
+                controller: _userCtrl,
+                decoration: const InputDecoration(labelText: 'User'),
+                autofillHints: const [AutofillHints.username],
+              ),
+              TextField(
+                controller: _passCtrl,
+                decoration: const InputDecoration(labelText: 'Pass'),
+                obscureText: true,
+                autofillHints: const [AutofillHints.password],
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _onLogin(),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(onPressed: _onLogin, child: const Text('Login')),
+            ],
+          ),
         ),
       ),
     );

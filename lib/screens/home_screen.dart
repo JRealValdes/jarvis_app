@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../config.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,13 +16,37 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final ApiService _api = ApiService();
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
   final List<ChatMessage> _messages = [];
   final ScrollController _scrollController = ScrollController();
+
+  bool _wasAtBottom = true;
 
   @override
   void initState() {
     super.initState();
 
+    // Detectar si estaba abajo al hacer scroll
+    _scrollController.addListener(() {
+      final max = _scrollController.position.maxScrollExtent;
+      final current = _scrollController.position.pixels;
+      _wasAtBottom = (max - current).abs() < 50;
+    });
+
+    // Al aparecer el teclado (cuando el campo de texto gana foco)
+    _focusNode.addListener(() {
+      if (_focusNode.hasFocus && _wasAtBottom) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        });
+      }
+    });
+
+    // Mensaje inicial
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_messages.isEmpty) {
         _sendMessage(initial: true);
@@ -31,6 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -45,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
       });
@@ -67,7 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _scrollController.animateTo(
               _scrollController.position.maxScrollExtent,
-              duration: Duration(milliseconds: 300),
+              duration: const Duration(milliseconds: 300),
               curve: Curves.easeOut,
             );
           });
@@ -97,16 +124,33 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _logout() async {
+    const storage = FlutterSecureStorage();
+    await storage.delete(key: 'username');
+    await storage.delete(key: 'password');
+
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('J.A.R.V.I.S.'),
+        title: const Text('J.A.R.V.I.S.'),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh),
             tooltip: 'Resetear chat',
             onPressed: _resetChat,
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Cerrar sesión',
+            onPressed: _logout,
           ),
         ],
       ),
@@ -115,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
-              padding: EdgeInsets.all(8),
+              padding: const EdgeInsets.all(8),
               itemCount: _messages.length,
               itemBuilder: (context, index) => _messages[index],
             ),
@@ -127,14 +171,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
+                    focusNode: _focusNode,
                     textCapitalization: TextCapitalization.sentences,
                     keyboardType: TextInputType.multiline,
                     maxLines: null,
-                    decoration: InputDecoration(hintText: 'Escribe un mensaje...'),
+                    decoration: const InputDecoration(hintText: 'Escribe un mensaje...'),
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.send),
+                  icon: const Icon(Icons.send),
                   onPressed: _sendMessage,
                 )
               ],
