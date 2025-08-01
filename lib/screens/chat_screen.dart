@@ -86,10 +86,19 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _sendMessage({bool initial = false}) async {
-    final text = initial ? "Hola" : _controller.text.trim();
-    if (text.isEmpty) return;
-
-    if (!initial) {
+    final String text;
+    if (initial) {
+      text = "Hola";
+      final resp = await _api.resetSession();
+      if (resp.statusCode != 200) {
+        setState(() {
+          _messages.add(ChatMessage(text: 'Error al resetear: ${resp.statusCode}', isUser: false));
+        });
+        return;
+      }
+    } else {
+      text = _controller.text.trim();
+      if (text.isEmpty) return;
       setState(() {
         _messages.add(ChatMessage(text: text, isUser: true));
       });
@@ -112,9 +121,11 @@ class _ChatScreenState extends State<ChatScreen> {
       final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
       final responses = List<String>.from(decoded['response'] ?? []);
 
-      setState(() {
-        for (var msg in responses) {
-          _messages.add(ChatMessage(text: msg, isUser: false));
+      if (responses.isNotEmpty) {
+        setState(() {
+          for (var msg in responses) {
+            _messages.add(ChatMessage(text: msg, isUser: false));
+          }
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _scrollController.animateTo(
               _scrollController.position.maxScrollExtent,
@@ -122,8 +133,8 @@ class _ChatScreenState extends State<ChatScreen> {
               curve: Curves.easeOut,
             );
           });
-        }
-      });
+        });
+      }
     } else {
       setState(() {
         _messages.add(ChatMessage(text: 'Error: ${resp.statusCode}', isUser: false));

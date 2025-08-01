@@ -62,7 +62,7 @@ class LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Login to J.A.R.V.I.S. - v1.1.0')),
+      appBar: AppBar(title: const Text('Login to J.A.R.V.I.S. - v1.1.1')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: AutofillGroup(
