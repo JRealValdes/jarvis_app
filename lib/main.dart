@@ -33,10 +33,11 @@ class _JarvisAppState extends State<JarvisApp> {
   Future<void> _checkAuth() async {
     final valid = await _auth.validateToken();
     if (valid) {
-      final isAdmin = await _auth.isAdmin();
-      print('User is admin: $isAdmin');
+      // final isAdmin = await _auth.isAdmin();
+      // print('User is admin: $isAdmin');
       setState(() {
-        _defaultHome = isAdmin ? SessionManagerScreen() : ChatScreen();
+        // _defaultHome = isAdmin ? SessionManagerScreen() : ChatScreen();
+        _defaultHome = ChatScreen();
       });
     } else {
       await _auth.logout();

@@ -41,13 +41,14 @@ class LoginScreenState extends State<LoginScreen> {
       await _storage.write(key: 'username', value: username);
       await _storage.write(key: 'password', value: password);
 
-      final isAdmin = await _auth.isAdmin();
+      // final isAdmin = await _auth.isAdmin();
 
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => isAdmin ? SessionManagerScreen() : ChatScreen(),
+          // builder: (_) => isAdmin ? SessionManagerScreen() : ChatScreen(),
+          builder: (_) => ChatScreen(),
         ),
       );
     } else {
@@ -62,7 +63,7 @@ class LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Login to J.A.R.V.I.S. - v1.1.1')),
+      appBar: AppBar(title: const Text('Login to J.A.R.V.I.S. - v1.1.2')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: AutofillGroup(

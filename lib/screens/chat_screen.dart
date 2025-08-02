@@ -22,8 +22,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<ChatMessage> _messages = [];
   final ScrollController _scrollController = ScrollController();
   bool _isAdmin = false;
-
   bool _wasAtBottom = true;
+  bool _loading = false;
 
   @override
   void initState() {
@@ -55,26 +55,8 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     });
 
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final resp = await _api.getMessageHistory();
-      if (resp.statusCode == 200) {
-        final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
-        final history = decoded['messages'] as List<dynamic>;
-
-        if (history.isNotEmpty) {
-          setState(() {
-            for (var msg in history) {
-              if (msg['role'] == 'system') continue;
-              final isUser = msg['role'] == 'user';
-              _messages.add(ChatMessage(text: msg['content'], isUser: isUser));
-            }
-          });
-        } else {
-          _sendMessage(initial: true);
-        }
-      } else {
-        _sendMessage(initial: true);
-      }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshChat();
     });
   }
 
@@ -83,6 +65,40 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollController.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshChat() async {
+    setState(() {
+      _loading = true;
+      _messages.clear();
+    });
+
+    final resp = await _api.getMessageHistory();
+
+    if (!mounted) return;
+
+    if (resp.statusCode == 200) {
+      final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
+      final history = decoded['messages'] as List<dynamic>;
+
+      if (history.isEmpty) {
+        setState(() => _loading = false);
+        _sendMessage(initial: true);
+        return;
+      }
+
+      setState(() {
+        for (var msg in history) {
+          if (msg['role'] == 'system') continue;
+          final isUser = msg['role'] == 'user';
+          _messages.add(ChatMessage(text: msg['content'], isUser: isUser));
+        }
+        _loading = false;
+      });
+    } else {
+      setState(() => _loading = false);
+      _sendMessage(initial: true);
+    }
   }
 
   void _sendMessage({bool initial = false}) async {
@@ -175,17 +191,19 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false, // ⛔ Do not show "back" button
         title: const Text('J.A.R.V.I.S.'),
         actions: [
           if (_isAdmin)
             IconButton(
-              icon: const Icon(Icons.settings),
+              icon: const Icon(Icons.storage),
               tooltip: 'Session Manager',
-              onPressed: () {
-                Navigator.push(
+              onPressed: () async {
+                await Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const SessionManagerScreen()),
                 );
+                _refreshChat(); // Refresh when returning from Session Manager Screen
               },
             ),
           IconButton(
@@ -200,7 +218,9 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
-      body: Column(
+      body: _loading
+      ? const Center(child: CircularProgressIndicator())
+      : Column(
         children: [
           Expanded(
             child: ListView.builder(
