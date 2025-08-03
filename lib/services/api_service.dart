@@ -71,6 +71,19 @@ class ApiService {
     await _ensureBaseUrl();
     return authorizedGet('$_baseUrl/admin/cache-status');
   }
+  
+  Future<bool> getIndividualCacheExists() async {
+    await _ensureBaseUrl();
+    final response = await authorizedGet('$_baseUrl/individual-cache-status');
+
+    if (response.statusCode == 200) {
+      final body = jsonDecode(response.body);
+      return body['exists'] == true;
+    } else {
+      throw Exception('Error checking individual cache status: ${response.statusCode}');
+    }
+  }
+
 
   // === Authorized helpers ===
   Future<http.Response> authorizedGet(String url) async {

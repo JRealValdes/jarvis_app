@@ -62,6 +62,7 @@ class _SessionManagerScreenState extends State<SessionManagerScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Session Manager'),
+        automaticallyImplyLeading: false, // ⛔ Do not show "back" button
         actions: [
           IconButton(
             icon: const Icon(Icons.chat),

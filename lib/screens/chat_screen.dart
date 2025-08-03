@@ -67,39 +67,45 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  Future<void> _refreshChat() async {
-    setState(() {
-      _loading = true;
-      _messages.clear();
-    });
+Future<void> _refreshChat() async {
+  setState(() {
+    _loading = true;
+    _messages.clear();
+  });
 
-    final resp = await _api.getMessageHistory();
+  final historyResp = await _api.getMessageHistory();
+  final cacheExists = await _api.getIndividualCacheExists();
 
-    if (!mounted) return;
+  if (!mounted) return;
 
-    if (resp.statusCode == 200) {
-      final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
-      final history = decoded['messages'] as List<dynamic>;
+  if (historyResp.statusCode == 200) {
+    final histDecoded = jsonDecode(utf8.decode(historyResp.bodyBytes));
+    final history = histDecoded['messages'] as List<dynamic>;
 
-      if (history.isEmpty) {
-        setState(() => _loading = false);
-        _sendMessage(initial: true);
-        return;
+    if (history.isEmpty) {
+      // If there's cache but no history, it means only the welcome message was sent. Resetting session then:
+      if (cacheExists) {
+        await _api.resetSession();
       }
 
-      setState(() {
-        for (var msg in history) {
-          if (msg['role'] == 'system') continue;
-          final isUser = msg['role'] == 'user';
-          _messages.add(ChatMessage(text: msg['content'], isUser: isUser));
-        }
-        _loading = false;
-      });
-    } else {
       setState(() => _loading = false);
       _sendMessage(initial: true);
+      return;
     }
+
+    setState(() {
+      for (var msg in history) {
+        if (msg['role'] == 'system') continue;
+        final isUser = msg['role'] == 'user';
+        _messages.add(ChatMessage(text: msg['content'], isUser: isUser));
+      }
+      _loading = false;
+    });
+  } else {
+    setState(() => _loading = false);
+    _sendMessage(initial: true);
   }
+}
 
   void _sendMessage({bool initial = false}) async {
     final String text;
@@ -191,8 +197,8 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false, // ⛔ Do not show "back" button
         title: const Text('J.A.R.V.I.S.'),
+        automaticallyImplyLeading: false, // ⛔ Do not show "back" button
         actions: [
           if (_isAdmin)
             IconButton(
@@ -203,7 +209,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   context,
                   MaterialPageRoute(builder: (_) => const SessionManagerScreen()),
                 );
-                _refreshChat(); // Refresh when returning from Session Manager Screen
+                // _refreshChat(); // Refresh when returning from Session Manager Screen
               },
             ),
           IconButton(

@@ -63,15 +63,13 @@ class AuthService {
     final token = await getToken();
     if (token == null) return false;
 
-    final uri = Uri.parse('$baseUrl/ask');
-    final response = await http.post(
+    final uri = Uri.parse('$baseUrl/validate-token');
+    final response = await http.get(
       uri,
       headers: {
         'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
         'Accept': 'application/json',
-      },
-      body: json.encode({'message': 'ping', 'model_name': 'GPT_3_5'}),
+      }
     );
 
     // Si responde 200 es válido, si 401 u otro, inválido

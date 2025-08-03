@@ -10,7 +10,7 @@ See: https://github.com/JRealValdes/jarvis
 
 Want to try it now?
 
-👉 [Download APK](.app_release/jarvis_1.1.2.apk) *(Android, latest stable build)*
+👉 [Download APK](.app_release/jarvis_1.1.3.apk) *(Android, latest stable build)*
 
 > You may need to allow installation from unknown sources on your device.
 

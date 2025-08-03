@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../services/auth_service.dart';
 import 'chat_screen.dart';
-import 'session_manager_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -63,7 +62,7 @@ class LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Login to J.A.R.V.I.S. - v1.1.2')),
+      appBar: AppBar(title: const Text('Login to J.A.R.V.I.S. - v1.1.3')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: AutofillGroup(
