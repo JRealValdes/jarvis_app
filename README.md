@@ -18,8 +18,8 @@ Deeper layout and remote API contract: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.
 | [#2](https://github.com/JRealValdes/jarvis_app/issues/2) | Repo sanitation — **done** |
 | [#5](https://github.com/JRealValdes/jarvis_app/issues/5) | Remote-preferred + offline failover — **done** |
 | [#6](https://github.com/JRealValdes/jarvis_app/issues/6) | Local prompt/tool parity with Python — **done** |
-| [#3](https://github.com/JRealValdes/jarvis_app/issues/3) | Android emulator / device testing |
-| [#4](https://github.com/JRealValdes/jarvis_app/issues/4) | Cursor skill to build APK |
+| [#3](https://github.com/JRealValdes/jarvis_app/issues/3) | Android emulator / device testing — **done** |
+| [#4](https://github.com/JRealValdes/jarvis_app/issues/4) | Cursor skill to build APK — **done** |
 | [#11](https://github.com/JRealValdes/jarvis_app/issues/11) | Configurable remote API base URL (LAN / Tailscale) |
 | [#12](https://github.com/JRealValdes/jarvis_app/issues/12) | Remove Firebase URL discovery + Cloudflare stale-tunnel handling |
 
@@ -29,7 +29,7 @@ Mark a row **done** in this table when that issue ships (same PR / follow-up doc
 
 ## Download
 
-👉 [Download APK](.app_release/jarvis_1.1.3.apk) *(stale name: built as **1.1.3**; app source is **1.4.0** — rebuild before relying on Auto/offline + web search; see #4)*
+👉 [Download APK](.app_release/jarvis_1.4.0.apk)
 
 You may need to allow installation from unknown sources.
 
@@ -56,6 +56,18 @@ flutter run
 ```
 
 **Phone / emulator on Windows:** see [docs/dev-mobile.md](docs/dev-mobile.md) (SDK bootstrap script, AVD `jarvis_phone`, cold-boot tip, USB debugging).
+
+### How agents build the APK
+
+Project skill: `.cursor/skills/build-apk/` (triggers: “genera un nuevo apk”, “build apk”, “release android”).
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tooling/build_apk.ps1 -RemoveOldApks
+```
+
+- Uses `flutter build apk --release` with the **debug keystore** (personal sideload).
+- Artifact: `.app_release/jarvis_<pubspec-version>.apk` (tracked for convenience).
+- Never bake OpenAI keys into the binary; users paste keys at runtime.
 
 ### Smoke-test: Auto / offline failover
 

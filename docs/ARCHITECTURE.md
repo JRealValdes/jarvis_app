@@ -74,8 +74,8 @@ Stale tunnel URLs: HTTP **404** or Cloudflare **1016** → refresh Firebase URL 
 
 ## Versioning
 
-- App semver: `pubspec.yaml` (`1.4.0` after #6).
-- Checked-in APK under `.app_release/` may lag until rebuilt (#4). Prefer building from source for Auto/offline builds.
+- App semver: `pubspec.yaml` (`1.4.0`).
+- Sideload APK: `.app_release/jarvis_<version>.apk` via `tooling/build_apk.ps1` / skill `build-apk`.
 - Android `local.properties` `flutter.versionName` is gitignored and refreshed by Flutter tooling — ignore skew vs pubspec.
 
 ## Local agent parity (#6)
@@ -88,4 +88,4 @@ Stale tunnel URLs: HTTP **404** or Cloudflare **1016** → refresh Firebase URL 
 ## Mobile / release tooling
 
 - **#3:** Local emulator recipe — [docs/dev-mobile.md](dev-mobile.md).
-- **#4:** Cursor skill to build/publish APK (tracked separately).
+- **#4:** Agent APK skill — `.cursor/skills/build-apk/` + `tooling/build_apk.ps1` → `.app_release/jarvis_<version>.apk` (debug-keystore sideload).
