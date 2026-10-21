@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jarvis_app/agent/remote_cache_parsing.dart';
+import 'package:jarvis_app/agent/remote/remote_cache_parsing.dart';
 
 void main() {
   group('parseCacheSessionEntry', () {

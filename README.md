@@ -76,9 +76,9 @@ Android SDK / emulator setup is tracked in [#3](https://github.com/JRealValdes/j
 ## Architecture (short)
 
 ```
-ChatScreen → JarvisBackend
-               ├─ LocalJarvisAgent  (OpenAI + sqflite)
-               └─ RemoteJarvisApi   (RemoteApiClient → home FastAPI)
+ChatScreen → ChatController → JarvisBackend
+                                ├─ LocalJarvisAgent  (OpenAI + sqflite)
+                                └─ RemoteJarvisApi   (agent/remote → FastAPI)
 ```
 
 Histories are **not** merged when switching modes. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

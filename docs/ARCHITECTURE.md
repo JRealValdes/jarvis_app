@@ -6,21 +6,24 @@ Mobile client for [JRealValdes/jarvis](https://github.com/JRealValdes/jarvis).
 
 | Layer | Role |
 |-------|------|
-| `screens/` / `widgets/` | UI |
-| `agent/` | `JarvisBackend` implementations (local OpenAI agent + remote FastAPI) |
+| `screens/` / `widgets/` | Presentation |
+| `agent/` | Backends + chat orchestration |
+| `agent/remote/` | FastAPI client, JWT auth, Firebase URL |
 | `domain/` | Pure chat state, prompts, models |
 | `data/` | Secure storage + local SQLite history |
-| `services/` | Auth (JWT) + Firebase URL lookup (remote only) |
-| `config/` | Defaults (models, endpoints) |
+| `config/` | Defaults (models, seed message, endpoints) |
 
 ```text
 ChatScreen
-    └─ BackendFactory
-           ├─ LocalJarvisAgent  → OpenAI + sqflite
-           └─ RemoteJarvisApi   → RemoteApiClient → FastAPI
+    └─ ChatController
+           └─ BackendFactory
+                  ├─ LocalJarvisAgent  → OpenAI + sqflite
+                  └─ RemoteJarvisApi   → RemoteEndpoint + JWT HTTP
 ```
 
-Session Manager is **remote admin only** (JWT `admin` truthy). Kept intentionally until Auto/offline (#5) reshapes ops UX.
+`RemoteEndpoint` is the single base-URL resolver (Firebase `jarvis/latest_url`). Auth (`/token`) and chat/admin calls share it; Basic vs Bearer headers stay in their callers.
+
+Session Manager is **remote admin only** (JWT `admin` truthy). Kept until Auto/offline (#5) reshapes ops UX.
 
 ## Modes
 
@@ -57,6 +60,7 @@ Stale tunnel URLs: HTTP **404** or Cloudflare **1016** → refresh Firebase URL 
 - Checked-in APK under `.app_release/` may lag until rebuilt (#4). Prefer building from source for local-agent builds.
 - Android `local.properties` `flutter.versionName` is gitignored and refreshed by Flutter tooling — ignore skew vs pubspec.
 
-## Intentional remote-admin UI
+## Future simplifications (tracked elsewhere)
 
-`SessionManagerScreen` stays for remote JWT admins. It is out of local/offline scope; Auto/offline UX (#5) may revisit it later.
+- **#5:** Split `SecureStore` into local credentials vs remote session when Auto/offline lands (API key gate + ephemeral offline store).
+- **#6:** Trim or fully own the Python ID-protocol / hostile prompt surface in `domain/chat_state.dart` once local prompt parity is decided.

@@ -5,8 +5,8 @@ import 'domain/models/jarvis_mode.dart';
 import 'screens/chat_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/setup_screen.dart';
-import 'services/auth_service.dart';
-import 'services/firebase_service.dart';
+import 'agent/remote/auth_service.dart';
+import 'agent/remote/firebase_service.dart';
 
 class JarvisApp extends StatelessWidget {
   const JarvisApp({super.key});

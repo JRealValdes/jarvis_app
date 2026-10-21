@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/secure_store.dart';
-import '../services/auth_service.dart';
+import '../agent/remote/auth_service.dart';
 import 'chat_screen.dart';
 import 'settings_screen.dart';
 

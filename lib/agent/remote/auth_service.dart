@@ -3,21 +3,28 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:jwt_decoder/jwt_decoder.dart';
 
-import '../data/secure_store.dart';
+import '../../data/secure_store.dart';
+import 'endpoint.dart';
 import 'firebase_service.dart';
 
 /// Remote FastAPI authentication (JWT). Not used in local mode.
 class AuthService {
-  AuthService({SecureStore? secureStore, FirebaseService? firebase})
-      : _store = secureStore ?? SecureStore(),
-        _firebase = firebase ?? FirebaseService();
+  AuthService({
+    SecureStore? secureStore,
+    RemoteEndpoint? endpoint,
+  })  : _store = secureStore ?? SecureStore(),
+        _endpoint = endpoint ?? RemoteEndpoint();
 
   final SecureStore _store;
-  final FirebaseService _firebase;
+  final RemoteEndpoint _endpoint;
 
   Future<bool> login(String username, String password) async {
-    await FirebaseService.ensureInit();
-    final baseUrl = await _firebase.fetchApiBaseUrl();
+    try {
+      await FirebaseService.ensureInit();
+    } catch (_) {
+      return false;
+    }
+    final baseUrl = await _endpoint.resolve(forceRefresh: true);
     if (baseUrl == null) return false;
 
     final uri = Uri.parse('$baseUrl/token');
@@ -48,7 +55,7 @@ class AuthService {
     } catch (_) {
       return false;
     }
-    final baseUrl = await _firebase.fetchApiBaseUrl();
+    final baseUrl = await _endpoint.resolve();
     if (baseUrl == null) return false;
     final token = await getToken();
     if (token == null) return false;

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../agent/backend_factory.dart';
-import '../agent/remote_jarvis_api.dart';
+import '../agent/remote/remote_jarvis_api.dart';
 import 'chat_screen.dart';
 
 /// Admin-only remote cache inspector (home FastAPI). Not used in local mode.

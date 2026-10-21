@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../agent/backend_factory.dart';
-import '../agent/jarvis_backend.dart';
-import '../config/app_config.dart';
-import '../data/secure_store.dart';
+import '../agent/chat_controller.dart';
 import '../domain/models/jarvis_mode.dart';
-import '../services/auth_service.dart';
 import '../widgets/chat_message_bubble.dart';
 import 'login_screen.dart';
 import 'session_manager_screen.dart';
@@ -19,21 +15,16 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final _factory = BackendFactory();
-  final _secureStore = SecureStore();
-  final _auth = AuthService();
-  final _controller = TextEditingController();
+  final _chat = ChatController();
+  final _input = TextEditingController();
   final _focusNode = FocusNode();
   final _scrollController = ScrollController();
-  final List<_Bubble> _messages = [];
-
-  JarvisBackend? _backend;
-  JarvisMode _mode = JarvisMode.local;
-  String _modelName = 'gpt-4o-mini';
-  bool _isAdmin = false;
   bool _wasAtBottom = true;
-  bool _loading = false;
-  bool _sending = false;
+
+  void _rebuild() {
+    if (mounted) setState(() {});
+    _scrollToBottom();
+  }
 
   @override
   void initState() {
@@ -48,35 +39,16 @@ class _ChatScreenState extends State<ChatScreen> {
         _scrollToBottom();
       }
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
-  }
-
-  Future<void> _bootstrap() async {
-    final mode = await _secureStore.getMode();
-    // Remote FastAPI expects ModelEnum labels; local uses OpenAI model ids.
-    final model = mode == JarvisMode.remote
-        ? AppConfig.defaultRemoteModelEnum
-        : await _secureStore.getOpenAiModel();
-    final backend = await _factory.create();
-    var isAdmin = false;
-    if (mode == JarvisMode.remote) {
-      isAdmin = await _auth.isAdmin();
-    }
-    if (!mounted) return;
-    setState(() {
-      _mode = mode;
-      _modelName = model;
-      _backend = backend;
-      _isAdmin = isAdmin;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _chat.bootstrap(onUpdate: _rebuild);
     });
-    await _refreshChat();
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
     _focusNode.dispose();
-    _controller.dispose();
+    _input.dispose();
     super.dispose();
   }
 
@@ -91,99 +63,15 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  Future<void> _refreshChat() async {
-    final backend = _backend;
-    if (backend == null) return;
-
-    setState(() {
-      _loading = true;
-      _messages.clear();
-    });
-
-    try {
-      final history = await backend.getMessageHistory();
-      final cacheExists = await backend.individualCacheExists();
-      if (!mounted) return;
-
-      if (history.isEmpty) {
-        if (cacheExists) {
-          await backend.resetSession();
-        }
-        setState(() => _loading = false);
-        await _sendMessage(initial: true);
-        return;
-      }
-
-      setState(() {
-        for (final msg in history) {
-          if (msg.isSystem) continue;
-          _messages.add(_Bubble(text: msg.content, isUser: msg.isUser));
-        }
-        _loading = false;
-      });
-      _scrollToBottom();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _loading = false);
-      await _sendMessage(initial: true);
-    }
+  Future<void> _send() async {
+    final text = _input.text;
+    _input.clear();
+    await _chat.send(text: text, onUpdate: _rebuild);
   }
 
-  Future<void> _sendMessage({bool initial = false}) async {
-    final backend = _backend;
-    if (backend == null || _sending) return;
-
-    final String text;
-    if (initial) {
-      // Seed turn that advances ChatState welcome → starting (any non-empty text).
-      text = 'Hello';
-      try {
-        await backend.resetSession();
-      } catch (e) {
-        if (!mounted) return;
-        setState(() {
-          _messages.add(_Bubble(text: 'Reset failed: $e', isUser: false));
-        });
-        return;
-      }
-    } else {
-      text = _controller.text.trim();
-      if (text.isEmpty) return;
-      setState(() {
-        _messages.add(_Bubble(text: text, isUser: true));
-      });
-      _scrollToBottom();
-      _controller.clear();
-    }
-
-    setState(() => _sending = true);
+  Future<void> _reset() async {
     try {
-      final responses = await backend.ask(text, modelName: _modelName);
-      if (!mounted) return;
-      setState(() {
-        for (final msg in responses) {
-          _messages.add(_Bubble(text: msg, isUser: false));
-        }
-      });
-      _scrollToBottom();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _messages.add(_Bubble(text: 'Error: $e', isUser: false));
-      });
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
-  }
-
-  Future<void> _resetChat() async {
-    final backend = _backend;
-    if (backend == null) return;
-    try {
-      await backend.resetSession();
-      if (!mounted) return;
-      setState(() => _messages.clear());
-      await _sendMessage(initial: true);
+      await _chat.resetChat(onUpdate: _rebuild);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -193,7 +81,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _logoutRemote() async {
-    await _auth.logout();
+    await _chat.logoutRemote();
     if (!mounted) return;
     Navigator.pushReplacement(
       context,
@@ -206,7 +94,7 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          _mode == JarvisMode.local
+          _chat.mode == JarvisMode.local
               ? 'J.A.R.V.I.S. (local)'
               : 'J.A.R.V.I.S. (remote)',
         ),
@@ -221,10 +109,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 MaterialPageRoute(builder: (_) => const SettingsScreen()),
               );
               if (!mounted) return;
-              await _bootstrap();
+              await _chat.bootstrap(onUpdate: _rebuild);
             },
           ),
-          if (_isAdmin && _mode == JarvisMode.remote)
+          if (_chat.isAdmin && _chat.mode == JarvisMode.remote)
             IconButton(
               icon: const Icon(Icons.storage),
               tooltip: 'Session Manager',
@@ -240,9 +128,9 @@ class _ChatScreenState extends State<ChatScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Reset chat',
-            onPressed: _resetChat,
+            onPressed: _reset,
           ),
-          if (_mode == JarvisMode.remote)
+          if (_chat.mode == JarvisMode.remote)
             IconButton(
               icon: const Icon(Icons.logout),
               tooltip: 'Log out',
@@ -250,7 +138,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
         ],
       ),
-      body: _loading
+      body: _chat.loading
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
@@ -258,9 +146,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.all(8),
-                    itemCount: _messages.length,
+                    itemCount: _chat.messages.length,
                     itemBuilder: (context, index) {
-                      final m = _messages[index];
+                      final m = _chat.messages[index];
                       return ChatMessageBubble(
                         text: m.text,
                         isUser: m.isUser,
@@ -268,28 +156,28 @@ class _ChatScreenState extends State<ChatScreen> {
                     },
                   ),
                 ),
-                if (_sending) const LinearProgressIndicator(minHeight: 2),
+                if (_chat.sending) const LinearProgressIndicator(minHeight: 2),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
                   child: Row(
                     children: [
                       Expanded(
                         child: TextField(
-                          controller: _controller,
+                          controller: _input,
                           focusNode: _focusNode,
                           textCapitalization: TextCapitalization.sentences,
                           keyboardType: TextInputType.multiline,
                           maxLines: null,
-                          enabled: !_sending,
+                          enabled: !_chat.sending,
                           decoration: const InputDecoration(
                             hintText: 'Type a message...',
                           ),
-                          onSubmitted: (_) => _sendMessage(),
+                          onSubmitted: (_) => _send(),
                         ),
                       ),
                       IconButton(
                         icon: const Icon(Icons.send),
-                        onPressed: _sending ? null : () => _sendMessage(),
+                        onPressed: _chat.sending ? null : _send,
                       ),
                     ],
                   ),
@@ -298,10 +186,4 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
     );
   }
-}
-
-class _Bubble {
-  _Bubble({required this.text, required this.isUser});
-  final String text;
-  final bool isUser;
 }

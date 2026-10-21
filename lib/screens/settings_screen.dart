@@ -4,7 +4,7 @@ import '../agent/backend_factory.dart';
 import '../app.dart';
 import '../data/secure_store.dart';
 import '../domain/models/jarvis_mode.dart';
-import '../services/auth_service.dart';
+import '../agent/remote/auth_service.dart';
 import '../widgets/local_setup_form.dart';
 import 'login_screen.dart';
 

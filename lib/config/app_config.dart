@@ -37,4 +37,7 @@ class AppConfig {
 
   /// Local conversation thread id (single-user personal app).
   static const String localThreadId = 'local';
+
+  /// Hidden seed turn used to advance ChatState on an empty thread.
+  static const String seedUserMessage = 'Hello';
 }
