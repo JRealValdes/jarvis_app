@@ -16,10 +16,14 @@ Deeper layout and remote API contract: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.
 |-------|------|
 | [#1](https://github.com/JRealValdes/jarvis_app/issues/1) | On-device agent MVP — **done** |
 | [#2](https://github.com/JRealValdes/jarvis_app/issues/2) | Repo sanitation — **done** |
-| [#5](https://github.com/JRealValdes/jarvis_app/issues/5) | Remote-preferred + offline failover |
-| [#6](https://github.com/JRealValdes/jarvis_app/issues/6) | Local prompt/tool parity with Python |
+| [#5](https://github.com/JRealValdes/jarvis_app/issues/5) | Remote-preferred + offline failover — **done** |
+| [#6](https://github.com/JRealValdes/jarvis_app/issues/6) | Local prompt/tool parity with Python — **done** |
 | [#3](https://github.com/JRealValdes/jarvis_app/issues/3) | Android emulator / device testing |
 | [#4](https://github.com/JRealValdes/jarvis_app/issues/4) | Cursor skill to build APK |
+| [#11](https://github.com/JRealValdes/jarvis_app/issues/11) | Configurable remote API base URL (LAN / Tailscale) |
+| [#12](https://github.com/JRealValdes/jarvis_app/issues/12) | Remove Firebase URL discovery + Cloudflare stale-tunnel handling |
+
+Mark a row **done** in this table when that issue ships (same PR / follow-up docs commit). Verification (unit tests + smoke) stays **inside** each issue — no separate test-only issue. Backend mirror: [jarvis#29](https://github.com/JRealValdes/jarvis/issues/29) (Pi/LAN), [#31](https://github.com/JRealValdes/jarvis/issues/31) (Tailscale), [#30](https://github.com/JRealValdes/jarvis/issues/30) (drop cloudflared/Firebase).
 
 ---
 
@@ -51,7 +55,7 @@ On Windows, Flutter plugin builds may require **Developer Mode** (symlink suppor
 flutter run
 ```
 
-Android SDK / emulator setup is tracked in [#3](https://github.com/JRealValdes/jarvis_app/issues/3).
+**Phone / emulator on Windows:** see [docs/dev-mobile.md](docs/dev-mobile.md) (SDK bootstrap script, AVD `jarvis_phone`, cold-boot tip, USB debugging).
 
 ### Smoke-test: Auto / offline failover
 
