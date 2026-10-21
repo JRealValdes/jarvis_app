@@ -8,6 +8,10 @@ class AppConfig {
   /// OpenAI model id used when the user has not chosen one.
   static const String defaultOpenAiModel = 'gpt-4o-mini';
 
+  /// Remote FastAPI `ModelEnum` member name (must match server default /
+  /// checkpointer key so `/ask` history and cache-status stay aligned).
+  static const String defaultRemoteModelEnum = 'GPT_4O_MINI';
+
   /// OpenAI Chat Completions endpoint.
   static const String openAiChatCompletionsUrl =
       'https://api.openai.com/v1/chat/completions';

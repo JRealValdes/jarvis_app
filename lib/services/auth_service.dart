@@ -84,6 +84,16 @@ class AuthService {
 
   Future<bool> isAdmin() async {
     final tokenData = await getTokenData();
-    return tokenData?['admin'] == 1;
+    return isAdminClaim(tokenData?['admin']);
+  }
+
+  /// JWT `admin` may be a Python bool (`true`) or a legacy `1`.
+  static bool isAdminClaim(Object? value) {
+    if (value == true || value == 1) return true;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      return normalized == 'true' || normalized == '1';
+    }
+    return false;
   }
 }

@@ -1,8 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_app/agent/tools/calc_tool.dart';
+import 'package:jarvis_app/config/app_config.dart';
 import 'package:jarvis_app/domain/chat_state.dart';
 import 'package:jarvis_app/domain/models/user_profile.dart';
 import 'package:jarvis_app/domain/prompts.dart';
+import 'package:jarvis_app/services/auth_service.dart';
 
 void main() {
   group('SafeCalculator', () {
@@ -64,6 +66,21 @@ void main() {
         buildBackgroundPrompt(validUser: true, user: user),
         contains('sir'),
       );
+    });
+  });
+
+  group('remote parity helpers', () {
+    test('JWT admin claim accepts bool and legacy 1', () {
+      expect(AuthService.isAdminClaim(true), isTrue);
+      expect(AuthService.isAdminClaim(1), isTrue);
+      expect(AuthService.isAdminClaim('true'), isTrue);
+      expect(AuthService.isAdminClaim(false), isFalse);
+      expect(AuthService.isAdminClaim(0), isFalse);
+      expect(AuthService.isAdminClaim(null), isFalse);
+    });
+
+    test('remote ModelEnum default matches server GPT_4O_MINI', () {
+      expect(AppConfig.defaultRemoteModelEnum, 'GPT_4O_MINI');
     });
   });
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../agent/backend_factory.dart';
 import '../agent/jarvis_backend.dart';
+import '../config/app_config.dart';
 import '../data/secure_store.dart';
 import '../domain/models/jarvis_mode.dart';
 import '../services/auth_service.dart';
@@ -54,7 +55,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final mode = await _secureStore.getMode();
     // Remote FastAPI expects ModelEnum labels; local uses OpenAI model ids.
     final model = mode == JarvisMode.remote
-        ? 'GPT_3_5'
+        ? AppConfig.defaultRemoteModelEnum
         : await _secureStore.getOpenAiModel();
     final backend = await _factory.create();
     var isAdmin = false;
