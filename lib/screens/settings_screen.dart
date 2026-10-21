@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../agent/local_jarvis_agent.dart';
+import '../agent/backend_factory.dart';
 import '../app.dart';
 import '../data/secure_store.dart';
 import '../domain/models/jarvis_mode.dart';
@@ -101,7 +101,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _clearLocalChat() async {
-    await LocalJarvisAgent().clearLocalConversation();
+    final backend = await BackendFactory(secureStore: _store).create();
+    await backend.resetSession();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Local conversation cleared.')),
@@ -135,23 +136,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
               'Remote uses your home FastAPI (PC/tunnel).',
             ),
           ),
-          RadioListTile<JarvisMode>(
-            title: const Text('Local (on-device agent)'),
-            subtitle: const Text('Default — no home server required'),
-            value: JarvisMode.local,
+          RadioGroup<JarvisMode>(
             groupValue: _mode,
-            onChanged: (v) {
-              if (v != null) _setMode(v);
+            onChanged: (mode) {
+              if (mode != null) _setMode(mode);
             },
-          ),
-          RadioListTile<JarvisMode>(
-            title: const Text('Remote (API)'),
-            subtitle: const Text('Advanced — requires reachable Jarvis FastAPI'),
-            value: JarvisMode.remote,
-            groupValue: _mode,
-            onChanged: (v) {
-              if (v != null) _setMode(v);
-            },
+            child: Column(
+              children: [
+                const RadioListTile<JarvisMode>(
+                  title: Text('Local (on-device agent)'),
+                  subtitle: Text('MVP default — no home server required'),
+                  value: JarvisMode.local,
+                ),
+                const RadioListTile<JarvisMode>(
+                  title: Text('Remote (API)'),
+                  subtitle: Text(
+                    'Advanced — requires reachable Jarvis FastAPI',
+                  ),
+                  value: JarvisMode.remote,
+                ),
+              ],
+            ),
           ),
           const Divider(),
           if (_mode == JarvisMode.local) ...[

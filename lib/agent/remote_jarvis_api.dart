@@ -1,14 +1,15 @@
 import 'dart:convert';
 
 import '../domain/models/chat_turn.dart';
-import '../services/api_service.dart';
 import 'jarvis_backend.dart';
+import 'remote_api_client.dart';
+import 'remote_cache_parsing.dart';
 
 /// Remote FastAPI backend (home/cloud server).
 class RemoteJarvisApi implements JarvisBackend, JarvisAdminBackend {
-  RemoteJarvisApi({ApiService? api}) : _api = api ?? ApiService();
+  RemoteJarvisApi({RemoteApiClient? api}) : _api = api ?? RemoteApiClient();
 
-  final ApiService _api;
+  final RemoteApiClient _api;
 
   @override
   Future<List<String>> ask(String message, {required String modelName}) async {
@@ -57,11 +58,7 @@ class RemoteJarvisApi implements JarvisBackend, JarvisAdminBackend {
     }
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
     final models = List<String>.from(data['agent_models'] ?? []);
-    final sessions = List<String>.from(data['sessions'] ?? []).map((s) {
-      final cleaned = s.replaceAll(RegExp(r"[()']"), '');
-      final parts = cleaned.split(', ');
-      return (parts[0], parts.length > 1 ? parts[1] : '');
-    }).toList();
+    final sessions = parseCacheSessionList(data['sessions'] as List<dynamic>? ?? []);
     return CacheStatus(agentModels: models, sessions: sessions);
   }
 

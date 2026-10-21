@@ -7,7 +7,3 @@ List<JarvisTool> builtInTools() => [
       CalculateTool(),
       CurrentDateTimeTool(),
     ];
-
-Map<String, JarvisTool> toolRegistry(List<JarvisTool> tools) {
-  return {for (final t in tools) t.name: t};
-}

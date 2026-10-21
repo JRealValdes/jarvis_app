@@ -6,7 +6,10 @@ enum ChatState {
   initialized,
 }
 
-/// Behavior when the user is not identified (local mode always validates).
+/// Behavior when the user is not identified.
+///
+/// Local MVP always uses a configured profile (`validUser: true`). Hostile /
+/// ID-protocol branches remain for parity with Python and possible use in #6.
 enum IdentificationFailedProtocol {
   automaticResponse,
   hostileResponses,

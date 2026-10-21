@@ -121,7 +121,8 @@ class LocalSetupFormState extends State<LocalSetupForm> {
       ),
       const SizedBox(height: 12),
       DropdownButtonFormField<String>(
-        value: _model,
+        key: ValueKey(_model),
+        initialValue: _model,
         decoration: const InputDecoration(labelText: 'Model'),
         items: AppConfig.openAiModelChoices
             .map((m) => DropdownMenuItem(value: m, child: Text(m)))

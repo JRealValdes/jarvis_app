@@ -23,11 +23,4 @@ class UserProfile {
       isFemale: json['is_female'] == true,
     );
   }
-
-  UserProfile copyWith({String? jarvisName, bool? isFemale}) {
-    return UserProfile(
-      jarvisName: jarvisName ?? this.jarvisName,
-      isFemale: isFemale ?? this.isFemale,
-    );
-  }
 }

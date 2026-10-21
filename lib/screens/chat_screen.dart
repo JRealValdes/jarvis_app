@@ -135,13 +135,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final String text;
     if (initial) {
-      text = 'Hola';
+      // Seed turn that advances ChatState welcome → starting (any non-empty text).
+      text = 'Hello';
       try {
         await backend.resetSession();
       } catch (e) {
         if (!mounted) return;
         setState(() {
-          _messages.add(_Bubble(text: 'Error al resetear: $e', isUser: false));
+          _messages.add(_Bubble(text: 'Reset failed: $e', isUser: false));
         });
         return;
       }
@@ -186,7 +187,7 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al resetear: $e')),
+        SnackBar(content: Text('Reset failed: $e')),
       );
     }
   }
@@ -238,13 +239,13 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            tooltip: 'Resetear chat',
+            tooltip: 'Reset chat',
             onPressed: _resetChat,
           ),
           if (_mode == JarvisMode.remote)
             IconButton(
               icon: const Icon(Icons.logout),
-              tooltip: 'Cerrar sesión',
+              tooltip: 'Log out',
               onPressed: _logoutRemote,
             ),
         ],
@@ -281,7 +282,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           maxLines: null,
                           enabled: !_sending,
                           decoration: const InputDecoration(
-                            hintText: 'Escribe un mensaje...',
+                            hintText: 'Type a message...',
                           ),
                           onSubmitted: (_) => _sendMessage(),
                         ),

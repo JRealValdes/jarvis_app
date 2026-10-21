@@ -23,9 +23,6 @@ class BackendFactory {
     }
   }
 
-  Future<RemoteJarvisApi?> createRemoteAdmin() async {
-    final mode = await currentMode();
-    if (mode != JarvisMode.remote) return null;
-    return RemoteJarvisApi();
-  }
+  /// Admin Session Manager — only meaningful in remote mode.
+  Future<RemoteJarvisApi> createRemote() async => RemoteJarvisApi();
 }

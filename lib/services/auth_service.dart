@@ -42,10 +42,6 @@ class AuthService {
 
   Future<String?> getToken() => _store.getJwtToken();
 
-  Future<void> saveToken(String token) => _store.setJwtToken(token);
-
-  Future<void> deleteToken() => _store.deleteJwtToken();
-
   Future<bool> validateToken() async {
     try {
       await FirebaseService.ensureInit();

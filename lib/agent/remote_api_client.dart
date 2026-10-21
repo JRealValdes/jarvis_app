@@ -2,18 +2,27 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import 'auth_service.dart';
-import 'firebase_service.dart';
+import '../services/auth_service.dart';
+import '../services/firebase_service.dart';
 
 /// Low-level HTTP client for the remote Jarvis FastAPI.
-class ApiService {
+///
+/// Resolves the base URL from Firebase (`jarvis/latest_url`) and attaches JWT.
+/// On tunnel hop (HTTP 404) or Cloudflare 1016, refreshes the URL once and retries.
+class RemoteApiClient {
+  RemoteApiClient({
+    AuthService? auth,
+    FirebaseService? firebase,
+  })  : _auth = auth ?? AuthService(),
+        _firebase = firebase ?? FirebaseService();
+
   String? _baseUrl;
-  final AuthService _auth = AuthService();
-  final FirebaseService _fb = FirebaseService();
+  final AuthService _auth;
+  final FirebaseService _firebase;
 
   Future<void> init() async {
     await FirebaseService.ensureInit();
-    _baseUrl = await _fb.fetchApiBaseUrl();
+    _baseUrl = await _firebase.fetchApiBaseUrl();
   }
 
   Future<void> _ensureBaseUrl() async {
@@ -22,7 +31,9 @@ class ApiService {
     }
   }
 
-  String get baseUrl => _baseUrl!;
+  /// True when the response likely means the published tunnel URL is stale.
+  static bool isStaleTunnelStatus(int statusCode) =>
+      statusCode == 404 || statusCode == 1016;
 
   Future<http.Response> postAsk(Map<String, dynamic> body) async {
     await _ensureBaseUrl();
@@ -37,7 +48,7 @@ class ApiService {
       },
       body: json.encode(body),
     );
-    if (response.statusCode == 404 || response.statusCode == 1016) {
+    if (isStaleTunnelStatus(response.statusCode)) {
       await init();
       return postAsk(body);
     }
@@ -59,7 +70,7 @@ class ApiService {
       body: body,
     );
 
-    if (response.statusCode == 404 || response.statusCode == 1016) {
+    if (isStaleTunnelStatus(response.statusCode)) {
       await init();
       return resetSession(threadId: threadId);
     }
@@ -132,7 +143,7 @@ class ApiService {
       },
     );
 
-    if (response.statusCode == 404 || response.statusCode == 1016) {
+    if (isStaleTunnelStatus(response.statusCode)) {
       await init();
       return getMessageHistory(threadId: threadId);
     }

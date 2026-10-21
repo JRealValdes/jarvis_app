@@ -67,7 +67,6 @@ class _JarvisBootGateState extends State<JarvisBootGate> {
     final valid = await auth.validateToken();
     if (!valid) {
       await auth.logout();
-      await store.deleteThreadId();
     }
     if (!mounted) return;
     setState(() {

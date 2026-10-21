@@ -11,9 +11,6 @@ class FirebaseService {
     _initialized = true;
   }
 
-  /// Legacy alias — prefer [ensureInit] (lazy, remote-only).
-  static Future<void> init() => ensureInit();
-
   Future<String?> fetchApiBaseUrl() async {
     await ensureInit();
     final dbRef = FirebaseDatabase.instance.ref('jarvis/latest_url');
