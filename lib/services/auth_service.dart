@@ -1,63 +1,57 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'firebase_service.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 
+import '../data/secure_store.dart';
+import 'firebase_service.dart';
+
+/// Remote FastAPI authentication (JWT). Not used in local mode.
 class AuthService {
-  final _storage = FlutterSecureStorage();
-  final FirebaseService _firebase = FirebaseService();
+  AuthService({SecureStore? secureStore, FirebaseService? firebase})
+      : _store = secureStore ?? SecureStore(),
+        _firebase = firebase ?? FirebaseService();
+
+  final SecureStore _store;
+  final FirebaseService _firebase;
 
   Future<bool> login(String username, String password) async {
+    await FirebaseService.ensureInit();
     final baseUrl = await _firebase.fetchApiBaseUrl();
-    print('🔍 baseUrl recuperado: $baseUrl');
+    if (baseUrl == null) return false;
 
-    if (baseUrl == null) {
-      print('❌ baseUrl es null');
-      return false;
-    }
-
-    print('🔑 Intentando iniciar sesión con usuario: $username');
-    print('🔐 Intentando iniciar sesión con contraseña: $password');
     final uri = Uri.parse('$baseUrl/token');
-    final basicAuth = 'Basic ${base64Encode(utf8.encode('$username:$password'))}';
-    print('🌐 URI final: $uri');
-    print('🔑 Auth header: $basicAuth');
+    final basicAuth =
+        'Basic ${base64Encode(utf8.encode('$username:$password'))}';
 
     final response = await http.post(
       uri,
       headers: {
         'Authorization': basicAuth,
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'application/json',
+      },
     );
 
-    print('📡 Código de respuesta: ${response.statusCode}');
-    print('📨 Respuesta body: ${response.body}');
-
     if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      print('🔐 Token recibido: ${data['access_token']}');
-      await _storage.write(key: 'jwt_token', value: data['access_token']);
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      await _store.setJwtToken(data['access_token'] as String);
       return true;
     }
-
     return false;
   }
 
-  Future<String?> getToken() async {
-    return await _storage.read(key: 'jwt_token');
-  }
+  Future<String?> getToken() => _store.getJwtToken();
 
-  Future<void> saveToken(String token) async {
-    await _storage.write(key: 'jwt_token', value: token);
-  }
+  Future<void> saveToken(String token) => _store.setJwtToken(token);
 
-  Future<void> deleteToken() async {
-    await _storage.delete(key: 'jwt_token');
-  }
+  Future<void> deleteToken() => _store.deleteJwtToken();
 
   Future<bool> validateToken() async {
+    try {
+      await FirebaseService.ensureInit();
+    } catch (_) {
+      return false;
+    }
     final baseUrl = await _firebase.fetchApiBaseUrl();
     if (baseUrl == null) return false;
     final token = await getToken();
@@ -69,32 +63,37 @@ class AuthService {
       headers: {
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',
-      }
+      },
     );
-
-    // Si responde 200 es válido, si 401 u otro, inválido
     return response.statusCode == 200;
   }
 
   Future<Map<String, dynamic>?> getTokenData() async {
     final token = await getToken();
     if (token == null) return null;
-
     try {
       return JwtDecoder.decode(token);
-    } catch (e) {
-      print("❌ Error al decodificar JWT: $e");
+    } catch (_) {
       return null;
     }
   }
 
   Future<void> logout() async {
-    await deleteToken();
+    await _store.clearRemoteCredentials();
   }
 
   Future<bool> isAdmin() async {
     final tokenData = await getTokenData();
-    print('🔍 Datos del token: $tokenData');
-    return tokenData?['admin'] == 1;
+    return isAdminClaim(tokenData?['admin']);
+  }
+
+  /// JWT `admin` may be a Python bool (`true`) or a legacy `1`.
+  static bool isAdminClaim(Object? value) {
+    if (value == true || value == 1) return true;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      return normalized == 'true' || normalized == '1';
+    }
+    return false;
   }
 }

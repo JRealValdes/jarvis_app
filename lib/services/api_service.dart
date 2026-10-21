@@ -1,14 +1,18 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
+
 import 'auth_service.dart';
 import 'firebase_service.dart';
 
+/// Low-level HTTP client for the remote Jarvis FastAPI.
 class ApiService {
   String? _baseUrl;
   final AuthService _auth = AuthService();
   final FirebaseService _fb = FirebaseService();
 
   Future<void> init() async {
+    await FirebaseService.ensureInit();
     _baseUrl = await _fb.fetchApiBaseUrl();
   }
 
@@ -71,7 +75,7 @@ class ApiService {
     await _ensureBaseUrl();
     return authorizedGet('$_baseUrl/admin/cache-status');
   }
-  
+
   Future<bool> getIndividualCacheExists() async {
     await _ensureBaseUrl();
     final response = await authorizedGet('$_baseUrl/individual-cache-status');
@@ -79,13 +83,12 @@ class ApiService {
     if (response.statusCode == 200) {
       final body = jsonDecode(response.body);
       return body['exists'] == true;
-    } else {
-      throw Exception('Error checking individual cache status: ${response.statusCode}');
     }
+    throw Exception(
+      'Error checking individual cache status: ${response.statusCode}',
+    );
   }
 
-
-  // === Authorized helpers ===
   Future<http.Response> authorizedGet(String url) async {
     final token = await _auth.getToken();
     final uri = Uri.parse(url);
@@ -98,7 +101,10 @@ class ApiService {
     );
   }
 
-  Future<http.Response> authorizedPost(String url, {Map<String, dynamic>? body}) async {
+  Future<http.Response> authorizedPost(
+    String url, {
+    Map<String, dynamic>? body,
+  }) async {
     final token = await _auth.getToken();
     final uri = Uri.parse(url);
     return http.post(
@@ -111,7 +117,7 @@ class ApiService {
     );
   }
 
-    Future<http.Response> getMessageHistory({String? threadId}) async {
+  Future<http.Response> getMessageHistory({String? threadId}) async {
     await _ensureBaseUrl();
     final token = await _auth.getToken();
     final uri = threadId != null
