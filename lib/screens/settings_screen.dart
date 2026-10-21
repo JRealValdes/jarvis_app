@@ -19,7 +19,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final _store = SecureStore();
   final _auth = AuthService();
-  JarvisMode _mode = JarvisMode.local;
+  JarvisMode _mode = JarvisMode.auto;
   String? _username;
   bool _loading = true;
 
@@ -45,33 +45,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await _store.setMode(mode);
     setState(() => _mode = mode);
 
-    if (mode == JarvisMode.remote && previous == JarvisMode.local) {
+    final leavingLocal = previous == JarvisMode.local;
+    final enteringRemoteish =
+        mode == JarvisMode.remote || mode == JarvisMode.auto;
+    final enteringLocal = mode == JarvisMode.local;
+    final leavingRemoteish =
+        previous == JarvisMode.remote || previous == JarvisMode.auto;
+
+    if (enteringRemoteish && leavingLocal) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Remote mode uses a separate server history. Local chats stay on device.',
+            mode == JarvisMode.auto
+                ? 'Auto prefers the server; offline OpenAI is ephemeral and not saved.'
+                : 'Remote mode uses a separate server history. Local chats stay on device.',
           ),
         ),
       );
-      final valid = await _auth.validateToken();
-      if (!mounted) return;
-      if (!valid) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-          (_) => false,
-        );
-        return;
+      if (mode == JarvisMode.remote) {
+        final valid = await _auth.validateToken();
+        if (!mounted) return;
+        if (!valid) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            (_) => false,
+          );
+          return;
+        }
       }
     }
 
-    if (mode == JarvisMode.local && previous == JarvisMode.remote) {
+    if (enteringLocal && leavingRemoteish) {
       final ready = await _store.isLocalConfigured();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Local mode uses on-device history. Remote chats stay on the server.',
+            'Local-only mode uses on-device history. Remote chats stay on the server.',
           ),
         ),
       );
@@ -117,6 +128,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  bool get _showLocalConfig =>
+      _mode == JarvisMode.local || _mode == JarvisMode.auto;
+
+  bool get _showRemoteSession =>
+      _mode == JarvisMode.remote || _mode == JarvisMode.auto;
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -132,8 +149,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const ListTile(
             title: Text('Execution mode'),
             subtitle: Text(
-              'Local talks to OpenAI from the phone. '
-              'Remote uses your home FastAPI (PC/tunnel).',
+              'Auto prefers Jarvis Server, then on-device OpenAI if unreachable. '
+              'Local-only and Remote-only disable failover.',
             ),
           ),
           RadioGroup<JarvisMode>(
@@ -141,29 +158,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (mode) {
               if (mode != null) _setMode(mode);
             },
-            child: Column(
+            child: const Column(
               children: [
-                const RadioListTile<JarvisMode>(
-                  title: Text('Local (on-device agent)'),
-                  subtitle: Text('MVP default — no home server required'),
+                RadioListTile<JarvisMode>(
+                  title: Text('Auto (remote preferred)'),
+                  subtitle: Text(
+                    'Default — offline failover when the server is down',
+                  ),
+                  value: JarvisMode.auto,
+                ),
+                RadioListTile<JarvisMode>(
+                  title: Text('Local only'),
+                  subtitle: Text('On-device OpenAI with disk history'),
                   value: JarvisMode.local,
                 ),
-                const RadioListTile<JarvisMode>(
-                  title: Text('Remote (API)'),
-                  subtitle: Text(
-                    'Advanced — requires reachable Jarvis FastAPI',
-                  ),
+                RadioListTile<JarvisMode>(
+                  title: Text('Remote only'),
+                  subtitle: Text('Requires reachable Jarvis FastAPI'),
                   value: JarvisMode.remote,
                 ),
               ],
             ),
           ),
           const Divider(),
-          if (_mode == JarvisMode.local) ...[
+          if (_showLocalConfig) ...[
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: Text(
-                'Local configuration',
+                'OpenAI (local / offline)',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
@@ -180,18 +202,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline),
-              title: const Text('Clear local conversation'),
-              onTap: _clearLocalChat,
-            ),
+            if (_mode == JarvisMode.local)
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: const Text('Clear local conversation'),
+                onTap: _clearLocalChat,
+              ),
             ListTile(
               leading: const Icon(Icons.key_off),
               title: const Text('Remove stored OpenAI API key'),
               onTap: _clearApiKey,
             ),
           ],
-          if (_mode == JarvisMode.remote) ...[
+          if (_showRemoteSession) ...[
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: Text(
@@ -229,6 +252,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             padding: EdgeInsets.all(16),
             child: Text(
               'Histories are separate: switching modes does not merge chats. '
+              'Offline (Auto failover) turns are ephemeral and cleared on restart. '
               'Do not redistribute APKs that contain someone else’s API key.',
               style: TextStyle(fontSize: 12),
             ),

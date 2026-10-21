@@ -2,8 +2,10 @@ import '../config/app_config.dart';
 import '../data/secure_store.dart';
 import '../domain/models/jarvis_mode.dart';
 import 'backend_factory.dart';
+import 'failover_jarvis_backend.dart';
 import 'jarvis_backend.dart';
 import 'remote/auth_service.dart';
+import 'remote/remote_failure.dart';
 
 /// One bubble shown in the chat list (UI-facing).
 class ChatBubble {
@@ -19,32 +21,70 @@ class ChatController {
     BackendFactory? factory,
     SecureStore? secureStore,
     AuthService? auth,
-  })  : _factory = factory ?? BackendFactory(),
-        _secureStore = secureStore ?? SecureStore(),
-        _auth = auth ?? AuthService();
+  })  : _secureStore = secureStore ?? SecureStore(),
+        _auth = auth ?? AuthService() {
+    _factory = factory ??
+        BackendFactory(
+          secureStore: _secureStore,
+          onEnteredOffline: () {
+            offlineActive = true;
+          },
+        );
+  }
 
-  final BackendFactory _factory;
+  late final BackendFactory _factory;
   final SecureStore _secureStore;
   final AuthService _auth;
 
   final List<ChatBubble> messages = [];
 
   JarvisBackend? _backend;
-  JarvisMode mode = JarvisMode.local;
+  JarvisMode mode = JarvisMode.auto;
   String modelName = AppConfig.defaultOpenAiModel;
   bool isAdmin = false;
   bool loading = false;
   bool sending = false;
 
+  /// Auto-mode: remote transport failed; offline agent is answering.
+  bool offlineActive = false;
+
+  /// Last send blocked because offline was needed and no API key is set.
+  bool needsOfflineKey = false;
+
+  FailoverJarvisBackend? get _failover =>
+      _backend is FailoverJarvisBackend ? _backend as FailoverJarvisBackend : null;
+
   Future<void> bootstrap({void Function()? onUpdate}) async {
     mode = await _secureStore.getMode();
-    modelName = mode == JarvisMode.remote
-        ? AppConfig.defaultRemoteModelEnum
-        : await _secureStore.getOpenAiModel();
+    offlineActive = false;
+    needsOfflineKey = false;
+    modelName = mode == JarvisMode.local
+        ? await _secureStore.getOpenAiModel()
+        : mode == JarvisMode.remote
+            ? AppConfig.defaultRemoteModelEnum
+            : AppConfig.defaultRemoteModelEnum;
+    // Auto uses remote model enum while online; OpenAI id after cutover.
+    if (mode == JarvisMode.auto) {
+      modelName = AppConfig.defaultRemoteModelEnum;
+    }
     _backend = await _factory.create();
-    isAdmin = mode == JarvisMode.remote && await _auth.isAdmin();
+    isAdmin = (mode == JarvisMode.remote || mode == JarvisMode.auto) &&
+        await _auth.isAdmin();
     onUpdate?.call();
     await refresh(onUpdate: onUpdate);
+    _syncOfflineFlag();
+    // After cutover during refresh, switch model id for OpenAI.
+    if (offlineActive && mode == JarvisMode.auto) {
+      modelName = await _secureStore.getOpenAiModel();
+    }
+    onUpdate?.call();
+  }
+
+  void _syncOfflineFlag() {
+    final f = _failover;
+    if (f != null && f.offlineActive) {
+      offlineActive = true;
+    }
   }
 
   Future<void> refresh({void Function()? onUpdate}) async {
@@ -57,6 +97,7 @@ class ChatController {
 
     try {
       final history = await backend.getMessageHistory();
+      _syncOfflineFlag();
       final cacheExists = await backend.individualCacheExists();
 
       if (history.isEmpty) {
@@ -75,7 +116,23 @@ class ChatController {
       }
       loading = false;
       onUpdate?.call();
-    } catch (_) {
+    } on OfflineKeyRequiredException catch (e) {
+      loading = false;
+      needsOfflineKey = true;
+      messages.add(ChatBubble(text: e.message, isUser: false));
+      onUpdate?.call();
+    } catch (e) {
+      if (classifyRemoteFailure(e) == RemoteFailureKind.auth) {
+        loading = false;
+        messages.add(
+          ChatBubble(
+            text: 'Remote authentication failed. Please log in again. ($e)',
+            isUser: false,
+          ),
+        );
+        onUpdate?.call();
+        return;
+      }
       loading = false;
       onUpdate?.call();
       await send(initial: true, onUpdate: onUpdate);
@@ -96,10 +153,34 @@ class ChatController {
       payload = AppConfig.seedUserMessage;
       try {
         await backend.resetSession();
-      } catch (e) {
-        messages.add(ChatBubble(text: 'Reset failed: $e', isUser: false));
+      } on OfflineKeyRequiredException catch (e) {
+        needsOfflineKey = true;
+        messages.add(ChatBubble(text: e.message, isUser: false));
         onUpdate?.call();
         return;
+      } catch (e) {
+        if (classifyRemoteFailure(e) == RemoteFailureKind.auth) {
+          messages.add(
+            ChatBubble(
+              text: 'Remote authentication failed. Please log in again. ($e)',
+              isUser: false,
+            ),
+          );
+          onUpdate?.call();
+          return;
+        }
+        // Transport during reset: Failover may already have entered offline.
+        _syncOfflineFlag();
+        if (!offlineActive && isFailoverCandidate(e)) {
+          messages.add(ChatBubble(text: 'Reset failed: $e', isUser: false));
+          onUpdate?.call();
+          return;
+        }
+        if (!offlineActive) {
+          messages.add(ChatBubble(text: 'Reset failed: $e', isUser: false));
+          onUpdate?.call();
+          return;
+        }
       }
     } else {
       payload = (text ?? '').trim();
@@ -108,14 +189,34 @@ class ChatController {
     }
 
     sending = true;
+    needsOfflineKey = false;
     onUpdate?.call();
     try {
+      if (offlineActive && mode == JarvisMode.auto) {
+        modelName = await _secureStore.getOpenAiModel();
+      }
       final responses = await backend.ask(payload, modelName: modelName);
+      _syncOfflineFlag();
+      if (offlineActive && mode == JarvisMode.auto) {
+        modelName = await _secureStore.getOpenAiModel();
+      }
       for (final msg in responses) {
         messages.add(ChatBubble(text: msg, isUser: false));
       }
+    } on OfflineKeyRequiredException catch (e) {
+      needsOfflineKey = true;
+      messages.add(ChatBubble(text: e.message, isUser: false));
     } catch (e) {
-      messages.add(ChatBubble(text: 'Error: $e', isUser: false));
+      if (classifyRemoteFailure(e) == RemoteFailureKind.auth) {
+        messages.add(
+          ChatBubble(
+            text: 'Remote authentication failed. Please log in again. ($e)',
+            isUser: false,
+          ),
+        );
+      } else {
+        messages.add(ChatBubble(text: 'Error: $e', isUser: false));
+      }
     } finally {
       sending = false;
       onUpdate?.call();
