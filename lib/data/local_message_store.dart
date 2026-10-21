@@ -13,7 +13,7 @@ class LocalMessageStore {
   Database? _db;
 
   Future<Database> _database() async {
-    if (_dbOverride != null) return _dbOverride!;
+    if (_dbOverride != null) return _dbOverride;
     if (_db != null) return _db!;
     final dbPath = await getDatabasesPath();
     _db = await openDatabase(
@@ -128,12 +128,6 @@ class LocalMessageStore {
     final db = await _database();
     await db.delete('ui_messages', where: 'thread_id = ?', whereArgs: [threadId]);
     await db.delete('threads', where: 'thread_id = ?', whereArgs: [threadId]);
-  }
-
-  Future<void> clearAll() async {
-    final db = await _database();
-    await db.delete('ui_messages');
-    await db.delete('threads');
   }
 }
 

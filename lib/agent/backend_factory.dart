@@ -2,7 +2,7 @@ import '../data/secure_store.dart';
 import '../domain/models/jarvis_mode.dart';
 import 'jarvis_backend.dart';
 import 'local_jarvis_agent.dart';
-import 'remote_jarvis_api.dart';
+import 'remote/remote_jarvis_api.dart';
 
 /// Resolves the active [JarvisBackend] from the stored execution mode.
 class BackendFactory {
@@ -23,9 +23,6 @@ class BackendFactory {
     }
   }
 
-  Future<RemoteJarvisApi?> createRemoteAdmin() async {
-    final mode = await currentMode();
-    if (mode != JarvisMode.remote) return null;
-    return RemoteJarvisApi();
-  }
+  /// Admin Session Manager — remote FastAPI only.
+  Future<RemoteJarvisApi> createRemote() async => RemoteJarvisApi();
 }

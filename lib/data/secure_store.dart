@@ -20,7 +20,6 @@ class SecureStore {
   static const _keyJwt = 'jwt_token';
   static const _keyUsername = 'username';
   static const _keyPassword = 'password';
-  static const _keyThreadId = 'thread_id';
 
   Future<JarvisMode> getMode() async {
     final value = await _storage.read(key: _keyMode);
@@ -105,14 +104,9 @@ class SecureStore {
     await _storage.delete(key: _keyPassword);
   }
 
-  Future<void> deleteThreadId() async {
-    await _storage.delete(key: _keyThreadId);
-  }
-
   Future<void> clearRemoteCredentials() async {
     await deleteJwtToken();
     await deleteUsername();
     await deletePassword();
-    await deleteThreadId();
   }
 }

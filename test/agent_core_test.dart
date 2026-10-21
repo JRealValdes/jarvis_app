@@ -4,7 +4,7 @@ import 'package:jarvis_app/config/app_config.dart';
 import 'package:jarvis_app/domain/chat_state.dart';
 import 'package:jarvis_app/domain/models/user_profile.dart';
 import 'package:jarvis_app/domain/prompts.dart';
-import 'package:jarvis_app/services/auth_service.dart';
+import 'package:jarvis_app/agent/remote/auth_service.dart';
 
 void main() {
   group('SafeCalculator', () {

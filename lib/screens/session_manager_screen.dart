@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../agent/remote_jarvis_api.dart';
+import '../agent/backend_factory.dart';
+import '../agent/remote/remote_jarvis_api.dart';
 import 'chat_screen.dart';
 
+/// Admin-only remote cache inspector (home FastAPI). Not used in local mode.
 class SessionManagerScreen extends StatefulWidget {
   const SessionManagerScreen({super.key});
 
@@ -11,7 +13,8 @@ class SessionManagerScreen extends StatefulWidget {
 }
 
 class _SessionManagerScreenState extends State<SessionManagerScreen> {
-  final RemoteJarvisApi _api = RemoteJarvisApi();
+  final _factory = BackendFactory();
+  RemoteJarvisApi? _api;
   List<(String, String)> _sessions = [];
   List<String> _validModels = [];
   bool _loading = true;
@@ -22,10 +25,15 @@ class _SessionManagerScreenState extends State<SessionManagerScreen> {
     _loadData();
   }
 
+  Future<RemoteJarvisApi> _remote() async {
+    return _api ??= await _factory.createRemote();
+  }
+
   Future<void> _loadData() async {
     setState(() => _loading = true);
     try {
-      final status = await _api.getCacheStatus();
+      final api = await _remote();
+      final status = await api.getCacheStatus();
       _validModels = status.agentModels;
       _sessions = status.sessions;
     } catch (_) {
@@ -40,24 +48,26 @@ class _SessionManagerScreenState extends State<SessionManagerScreen> {
 
   Future<void> _deleteSession(String model, String threadId) async {
     try {
-      await _api.resetSession(threadId: threadId);
+      final api = await _remote();
+      await api.resetSession(threadId: threadId);
       await _loadData();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error al eliminar sesión')),
+        const SnackBar(content: Text('Failed to delete session')),
       );
     }
   }
 
   Future<void> _clearGlobal() async {
     try {
-      await _api.resetGlobalMemory();
+      final api = await _remote();
+      await api.resetGlobalMemory();
       await _loadData();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error al eliminar globalmente')),
+        const SnackBar(content: Text('Failed to clear global cache')),
       );
     }
   }
@@ -71,6 +81,7 @@ class _SessionManagerScreenState extends State<SessionManagerScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.chat),
+            tooltip: 'Back to chat',
             onPressed: () {
               Navigator.pushReplacement(
                 context,
@@ -108,7 +119,7 @@ class _SessionManagerScreenState extends State<SessionManagerScreen> {
                   padding: const EdgeInsets.all(12),
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.warning),
-                    label: const Text('Borrar toda la caché'),
+                    label: const Text('Clear entire cache'),
                     onPressed: _clearGlobal,
                   ),
                 ),
