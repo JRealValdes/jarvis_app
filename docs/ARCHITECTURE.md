@@ -85,6 +85,7 @@ Stale tunnel URLs: HTTP **404** or Cloudflare **1016** → refresh Firebase URL 
 - Server-only: calendar, speech, LinkedIn drafts/examples, job-preferences YAML.
 - ID-protocol helpers in `chat_state.dart` kept for parity; unused while `validUser` is always true locally.
 
-## Future simplifications (tracked elsewhere)
+## Mobile / release tooling
 
-- **#3 / #4:** Emulator setup and APK Cursor skill.
+- **#3:** Local emulator recipe — [docs/dev-mobile.md](dev-mobile.md).
+- **#4:** Cursor skill to build/publish APK (tracked separately).
