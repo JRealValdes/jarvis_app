@@ -1,6 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+
+import '../agent/remote_jarvis_api.dart';
 import 'chat_screen.dart';
 
 class SessionManagerScreen extends StatefulWidget {
@@ -11,7 +11,7 @@ class SessionManagerScreen extends StatefulWidget {
 }
 
 class _SessionManagerScreenState extends State<SessionManagerScreen> {
-  final ApiService _api = ApiService();
+  final RemoteJarvisApi _api = RemoteJarvisApi();
   List<(String, String)> _sessions = [];
   List<String> _validModels = [];
   bool _loading = true;
@@ -24,36 +24,41 @@ class _SessionManagerScreenState extends State<SessionManagerScreen> {
 
   Future<void> _loadData() async {
     setState(() => _loading = true);
-    final resp = await _api.getCacheStatus();
-    if (resp.statusCode == 200) {
-      final data = jsonDecode(resp.body);
-      _validModels = List<String>.from(data['agent_models'] ?? []);
-      _sessions = List<String>.from(data['sessions'] ?? []).map((s) {
-        final cleaned = s.replaceAll(RegExp(r"[()']"), "");
-        final parts = cleaned.split(", ");
-        return (parts[0], parts[1]);
-      }).toList();
+    try {
+      final status = await _api.getCacheStatus();
+      _validModels = status.agentModels;
+      _sessions = status.sessions;
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to load cache status')),
+        );
+      }
     }
-    setState(() => _loading = false);
+    if (mounted) setState(() => _loading = false);
   }
 
   Future<void> _deleteSession(String model, String threadId) async {
-    final resp = await _api.resetSession(threadId: threadId);
-    if (resp.statusCode == 200) {
-      _loadData();
-    } else {
+    try {
+      await _api.resetSession(threadId: threadId);
+      await _loadData();
+    } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al eliminar sesión')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error al eliminar sesión')),
+      );
     }
   }
 
   Future<void> _clearGlobal() async {
-    final resp = await _api.resetGlobalMemory();
-    if (resp.statusCode == 200) {
-      _loadData();
-    } else {
+    try {
+      await _api.resetGlobalMemory();
+      await _loadData();
+    } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al eliminar globalmente')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error al eliminar globalmente')),
+      );
     }
   }
 
@@ -62,7 +67,7 @@ class _SessionManagerScreenState extends State<SessionManagerScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Session Manager'),
-        automaticallyImplyLeading: false, // ⛔ Do not show "back" button
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.chat),
@@ -72,7 +77,7 @@ class _SessionManagerScreenState extends State<SessionManagerScreen> {
                 MaterialPageRoute(builder: (_) => const ChatScreen()),
               );
             },
-          )
+          ),
         ],
       ),
       body: _loading
@@ -84,7 +89,6 @@ class _SessionManagerScreenState extends State<SessionManagerScreen> {
                     itemCount: _sessions.length,
                     itemBuilder: (context, index) {
                       final (model, threadId) = _sessions[index];
-                      print('🔍 Sesión: $model, ID: $threadId, Valid models: $_validModels');
                       final isValid = _validModels.contains(model);
                       return Container(
                         color: isValid ? null : Colors.red[100],
@@ -107,7 +111,7 @@ class _SessionManagerScreenState extends State<SessionManagerScreen> {
                     label: const Text('Borrar toda la caché'),
                     onPressed: _clearGlobal,
                   ),
-                )
+                ),
               ],
             ),
     );

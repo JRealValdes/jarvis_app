@@ -1,71 +1,80 @@
-# 🤖 J.A.R.V.I.S. App
+# J.A.R.V.I.S. App
 
-**Front-end mobile app for interacting with the Jarvis assistant.**  
-Fast, customizable, and connected to your own backend.
-See: https://github.com/JRealValdes/jarvis
+Mobile front-end for the Jarvis assistant ([Python backend](https://github.com/JRealValdes/jarvis)).
 
----
+Supports two execution modes:
 
-## 📱 Download
+| Mode | How it works |
+|------|----------------|
+| **Local (default)** | On-device agent: session state, prompts, calc/datetime tools, OpenAI Chat Completions from the phone. No home PC required. |
+| **Remote** | Existing FastAPI client: JWT login, Firebase-published base URL, server-side LangGraph agent. |
 
-Want to try it now?
-
-👉 [Download APK](.app_release/jarvis_1.1.3.apk) *(Android, latest stable build)*
-
-> You may need to allow installation from unknown sources on your device.
+Related epic: [issue #1](https://github.com/JRealValdes/jarvis_app/issues/1).
 
 ---
 
-## 🚀 Getting Started (Dev)
+## Download
 
-1. Clone the repo and open it in your favorite Flutter IDE.
-2. Add your Firebase config file at:
+👉 [Download APK](.app_release/jarvis_1.1.3.apk) *(Android; rebuild after local-agent changes)*
 
-```
-android/app/google-services.json
-```
+You may need to allow installation from unknown sources.
 
-Generate it from: [https://console.firebase.google.com](https://console.firebase.google.com)
+---
 
-3. Build and run:
+## Getting started (dev)
+
+1. Clone the repo and open it in a Flutter IDE.
+2. Install deps:
 
 ```bash
 flutter pub get
+```
+
+3. **Local mode** (default): run the app, complete Setup (OpenAI API key + profile). Firebase is not required.
+4. **Remote mode**: add Firebase config at `android/app/google-services.json`, switch to Remote in Settings, then log in against a reachable Jarvis API.
+
+```bash
 flutter run
+flutter test
 ```
 
 ---
 
-## 📌 Features
+## Local mode & security
 
-- ✅ Basic chat UI with message persistence
-- ✅ Reset chat button
-- ✅ Secure login with username/password
-- ✅ Autocomplete login with stored credentials
-- ✅ Token-based session via Firebase
-- ⏳ Recover session on app reopen
-- ⏳ Admin features (global reset, user tracking)
-- ⏳ Voice transcription support
+- Paste your OpenAI API key once; it is stored with `flutter_secure_storage` (Android Keystore).
+- **Never** commit keys or bake them into the APK. Treat builds as personal / sideload until you have a proxy.
+- Do not redistribute an APK that contains someone else’s key.
+- Calculator tool uses a restricted expression parser (not arbitrary code execution).
 
 ---
 
-## 🛣️ Roadmap
+## Features
 
-- [x] Basic app
-- [x] Reset chat button
-- [x] Persistent login
-- [x] Remember username and password
-- [ ] Individual chat-reset option
-- [ ] Admin will have 2 reset buttons: individual and global
-- [ ] User identification through first login, username as thread ID
-- [ ] Recover chat from session when reopening app
-- [ ] Manage token expiration
-- [ ] Voice transcription
+- Local on-device Jarvis (welcome flow, memory, reset, calc + datetime tools)
+- Settings: switch Local / Remote, edit key & profile
+- Remote chat UI (unchanged look) with JWT login
+- Recover local history on app reopen
+- Admin Session Manager (remote only)
 
 ---
 
-## 🛠 Tech Stack
+## Architecture (short)
+
+```
+ChatScreen → JarvisBackend
+               ├─ LocalJarvisAgent  (OpenAI + sqflite)
+               └─ RemoteJarvisApi   (home FastAPI)
+```
+
+Histories are **not** merged when switching modes.
+
+---
+
+## Tech stack
 
 - Flutter (Dart)
-- Firebase Auth + Firestore
-- REST API backend (custom)
+- OpenAI Chat Completions (local mode)
+- `flutter_secure_storage`, `sqflite`
+- Firebase Realtime Database (remote URL only)
+- Optional home FastAPI ([jarvis](https://github.com/JRealValdes/jarvis))
