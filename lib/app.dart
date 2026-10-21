@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'data/local_credentials.dart';
 import 'data/secure_store.dart';
 import 'domain/models/jarvis_mode.dart';
 import 'screens/chat_screen.dart';
@@ -20,7 +21,7 @@ class JarvisApp extends StatelessWidget {
   }
 }
 
-/// Mode-aware boot: local setup vs chat, or remote login vs chat.
+/// Mode-aware boot: local setup vs chat, or remote login vs chat / offline.
 class JarvisBootGate extends StatefulWidget {
   const JarvisBootGate({super.key});
 
@@ -52,7 +53,16 @@ class _JarvisBootGateState extends State<JarvisBootGate> {
       return;
     }
 
-    // Remote mode: Firebase + JWT.
+    if (mode == JarvisMode.remote) {
+      await _routeRemoteOnly();
+      return;
+    }
+
+    // Auto: remote preferred, offline if unreachable + key/profile ready.
+    await _routeAuto(store);
+  }
+
+  Future<void> _routeRemoteOnly() async {
     try {
       await FirebaseService.ensureInit();
     } catch (_) {
@@ -72,6 +82,40 @@ class _JarvisBootGateState extends State<JarvisBootGate> {
     setState(() {
       _home = valid ? const ChatScreen() : const LoginScreen();
     });
+  }
+
+  Future<void> _routeAuto(SecureStore store) async {
+    final local = LocalCredentials(store: store);
+    final auth = AuthService(secureStore: store);
+    final result = await auth.validateTokenDetailed();
+
+    if (!mounted) return;
+
+    switch (result) {
+      case TokenValidationResult.valid:
+        setState(() => _home = const ChatScreen());
+        return;
+      case TokenValidationResult.invalidAuth:
+        await auth.logout();
+        if (!mounted) return;
+        setState(() => _home = const LoginScreen());
+        return;
+      case TokenValidationResult.noToken:
+      case TokenValidationResult.unreachable:
+        final ready = await local.isConfigured();
+        if (!mounted) return;
+        if (ready) {
+          // Offline-capable (or will failover after login attempt in chat).
+          setState(() => _home = const ChatScreen());
+        } else if (result == TokenValidationResult.noToken) {
+          // Prefer login when we simply have no JWT; Setup if user wants offline.
+          setState(() => _home = const LoginScreen());
+        } else {
+          // Unreachable and no offline key — Setup with CTA for offline key.
+          setState(() => _home = const SetupScreen());
+        }
+        return;
+    }
   }
 
   @override

@@ -20,10 +20,22 @@ class _ChatScreenState extends State<ChatScreen> {
   final _focusNode = FocusNode();
   final _scrollController = ScrollController();
   bool _wasAtBottom = true;
+  bool _offlineSnackShown = false;
 
   void _rebuild() {
     if (mounted) setState(() {});
     _scrollToBottom();
+    if (_chat.offlineActive && !_offlineSnackShown) {
+      _offlineSnackShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Switched to offline mode. Messages will not be saved.'),
+          ),
+        );
+      });
+    }
   }
 
   @override
@@ -89,15 +101,33 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  String get _title {
+    switch (_chat.mode) {
+      case JarvisMode.local:
+        return 'J.A.R.V.I.S. (local)';
+      case JarvisMode.remote:
+        return 'J.A.R.V.I.S. (remote)';
+      case JarvisMode.auto:
+        return _chat.offlineActive
+            ? 'J.A.R.V.I.S. (offline)'
+            : 'J.A.R.V.I.S. (auto)';
+    }
+  }
+
+  bool get _showAdmin =>
+      _chat.isAdmin &&
+      (_chat.mode == JarvisMode.remote ||
+          (_chat.mode == JarvisMode.auto && !_chat.offlineActive));
+
+  bool get _showRemoteLogout =>
+      _chat.mode == JarvisMode.remote ||
+      (_chat.mode == JarvisMode.auto && !_chat.offlineActive);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          _chat.mode == JarvisMode.local
-              ? 'J.A.R.V.I.S. (local)'
-              : 'J.A.R.V.I.S. (remote)',
-        ),
+        title: Text(_title),
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
@@ -109,10 +139,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 MaterialPageRoute(builder: (_) => const SettingsScreen()),
               );
               if (!mounted) return;
+              _offlineSnackShown = false;
               await _chat.bootstrap(onUpdate: _rebuild);
             },
           ),
-          if (_chat.isAdmin && _chat.mode == JarvisMode.remote)
+          if (_showAdmin)
             IconButton(
               icon: const Icon(Icons.storage),
               tooltip: 'Session Manager',
@@ -130,7 +161,7 @@ class _ChatScreenState extends State<ChatScreen> {
             tooltip: 'Reset chat',
             onPressed: _reset,
           ),
-          if (_chat.mode == JarvisMode.remote)
+          if (_showRemoteLogout)
             IconButton(
               icon: const Icon(Icons.logout),
               tooltip: 'Log out',
@@ -142,6 +173,41 @@ class _ChatScreenState extends State<ChatScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
+                if (_chat.offlineActive)
+                  Material(
+                    color: Theme.of(context).colorScheme.secondaryContainer,
+                    child: const ListTile(
+                      dense: true,
+                      leading: Icon(Icons.cloud_off),
+                      title: Text(
+                        'Offline mode: messages handled here will not be saved.',
+                      ),
+                    ),
+                  ),
+                if (_chat.needsOfflineKey)
+                  Material(
+                    color: Theme.of(context).colorScheme.errorContainer,
+                    child: ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.key),
+                      title: const Text(
+                        'Server unreachable. Add an OpenAI API key for offline mode.',
+                      ),
+                      trailing: TextButton(
+                        onPressed: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const SettingsScreen(),
+                            ),
+                          );
+                          if (!mounted) return;
+                          await _chat.bootstrap(onUpdate: _rebuild);
+                        },
+                        child: const Text('Settings'),
+                      ),
+                    ),
+                  ),
                 Expanded(
                   child: ListView.builder(
                     controller: _scrollController,
@@ -168,7 +234,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           textCapitalization: TextCapitalization.sentences,
                           keyboardType: TextInputType.multiline,
                           maxLines: null,
-                          enabled: !_chat.sending,
+                          enabled: !_chat.sending && !_chat.needsOfflineKey,
                           decoration: const InputDecoration(
                             hintText: 'Type a message...',
                           ),
@@ -177,7 +243,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       IconButton(
                         icon: const Icon(Icons.send),
-                        onPressed: _chat.sending ? null : _send,
+                        onPressed: (_chat.sending || _chat.needsOfflineKey)
+                            ? null
+                            : _send,
                       ),
                     ],
                   ),

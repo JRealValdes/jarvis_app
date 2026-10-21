@@ -4,9 +4,10 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
 import '../domain/models/chat_turn.dart';
+import 'message_store.dart';
 
-/// On-device persistence for UI history and LLM message blobs per thread.
-class LocalMessageStore {
+/// On-device sqflite persistence for UI history and LLM message blobs per thread.
+class LocalMessageStore implements MessageStore {
   LocalMessageStore({Database? database}) : _dbOverride = database;
 
   final Database? _dbOverride;
@@ -42,6 +43,7 @@ class LocalMessageStore {
     return _db!;
   }
 
+  @override
   Future<bool> threadExists(String threadId) async {
     final db = await _database();
     final rows = await db.query(
@@ -53,6 +55,7 @@ class LocalMessageStore {
     return rows.isNotEmpty;
   }
 
+  @override
   Future<List<ChatTurn>> getUiHistory(String threadId) async {
     final db = await _database();
     final rows = await db.query(
@@ -71,6 +74,7 @@ class LocalMessageStore {
         .toList();
   }
 
+  @override
   Future<void> appendUiTurns(String threadId, List<ChatTurn> turns) async {
     if (turns.isEmpty) return;
     final db = await _database();
@@ -92,6 +96,7 @@ class LocalMessageStore {
     await batch.commit(noResult: true);
   }
 
+  @override
   Future<ThreadSnapshot?> loadThread(String threadId) async {
     final db = await _database();
     final rows = await db.query(
@@ -110,6 +115,7 @@ class LocalMessageStore {
     );
   }
 
+  @override
   Future<void> saveThread(ThreadSnapshot snapshot) async {
     final db = await _database();
     await db.insert(
@@ -124,6 +130,7 @@ class LocalMessageStore {
     );
   }
 
+  @override
   Future<void> clearThread(String threadId) async {
     final db = await _database();
     await db.delete('ui_messages', where: 'thread_id = ?', whereArgs: [threadId]);

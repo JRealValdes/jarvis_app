@@ -3,7 +3,10 @@ class AppConfig {
   AppConfig._();
 
   /// Default execution mode when nothing is stored yet.
-  static const String defaultMode = 'local';
+  static const String defaultMode = 'auto';
+
+  /// Short probe / remote call timeout before treating the server as down.
+  static const Duration remoteTransportTimeout = Duration(seconds: 8);
 
   /// OpenAI model id used when the user has not chosen one.
   static const String defaultOpenAiModel = 'gpt-4o-mini';
