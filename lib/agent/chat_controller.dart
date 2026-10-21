@@ -4,6 +4,7 @@ import '../domain/models/jarvis_mode.dart';
 import 'backend_factory.dart';
 import 'failover_jarvis_backend.dart';
 import 'jarvis_backend.dart';
+import 'openai/openai_errors.dart';
 import 'remote/auth_service.dart';
 import 'remote/remote_failure.dart';
 
@@ -215,7 +216,7 @@ class ChatController {
           ),
         );
       } else {
-        messages.add(ChatBubble(text: 'Error: $e', isUser: false));
+        messages.add(ChatBubble(text: describeOpenAiError(e), isUser: false));
       }
     } finally {
       sending = false;

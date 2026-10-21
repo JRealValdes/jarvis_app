@@ -2,6 +2,7 @@ import '../../domain/chat_state.dart';
 import '../../domain/models/user_profile.dart';
 import '../../domain/prompts.dart';
 import '../openai/openai_client.dart';
+import '../openai/openai_errors.dart';
 import '../tools/tool.dart';
 
 /// Orchestrates a conversation turn: state, prompts, and LLM (ported from Python).
@@ -89,9 +90,7 @@ class JarvisSession {
         return result.assistantTexts;
       }
     } catch (e) {
-      return [
-        'There was an error processing your request, sir. Error: $e',
-      ];
+      return [describeOpenAiError(e)];
     }
 
     return [automaticResponseIfIdFailed];

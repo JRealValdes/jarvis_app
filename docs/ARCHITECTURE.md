@@ -74,11 +74,17 @@ Stale tunnel URLs: HTTP **404** or Cloudflare **1016** → refresh Firebase URL 
 
 ## Versioning
 
-- App semver: `pubspec.yaml` (`1.3.0` after #5).
+- App semver: `pubspec.yaml` (`1.4.0` after #6).
 - Checked-in APK under `.app_release/` may lag until rebuilt (#4). Prefer building from source for Auto/offline builds.
 - Android `local.properties` `flutter.versionName` is gitignored and refreshed by Flutter tooling — ignore skew vs pubspec.
 
+## Local agent parity (#6)
+
+- Prompts: `domain/prompts.dart` tracks Python language + datetime/web-search rules; hostile path retained.
+- On-device tools: calc, datetime, `web_search_tool` (DuckDuckGo HTML + public fetch with Glassdoor/SSRF policy).
+- Server-only: calendar, speech, LinkedIn drafts/examples, job-preferences YAML.
+- ID-protocol helpers in `chat_state.dart` kept for parity; unused while `validUser` is always true locally.
+
 ## Future simplifications (tracked elsewhere)
 
-- **#6:** Local prompt/tool parity with Python `prompts.py` / builtins.
 - **#3 / #4:** Emulator setup and APK Cursor skill.

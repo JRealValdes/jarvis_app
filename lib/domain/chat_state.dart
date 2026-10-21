@@ -8,8 +8,10 @@ enum ChatState {
 
 /// Behavior when the user is not identified.
 ///
-/// Local MVP always uses a configured profile (`validUser: true`). Hostile /
-/// ID-protocol branches remain for parity with Python and possible use in #6.
+/// **Explicit #6 choice:** keep ID-protocol / hostile branches for parity with
+/// Python. Local and offline production paths always use a configured profile
+/// (`validUser: true`), so these helpers are unused there — do not delete them
+/// without revisiting hostile/intruder UX.
 enum IdentificationFailedProtocol {
   automaticResponse,
   hostileResponses,

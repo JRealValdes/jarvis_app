@@ -6,6 +6,7 @@ import 'package:http/testing.dart';
 import 'package:jarvis_app/agent/openai/openai_client.dart';
 import 'package:jarvis_app/agent/tools/calc_tool.dart';
 import 'package:jarvis_app/agent/tools/datetime_tool.dart';
+import 'package:jarvis_app/agent/tools/registry.dart';
 
 void main() {
   test('OpenAI tool-calling loop executes calculate_tool then returns text', () async {
@@ -77,5 +78,14 @@ void main() {
     final dt = CurrentDateTimeTool().toOpenAiTool();
     expect(calc['function']['name'], 'calculate_tool');
     expect(dt['function']['name'], 'current_date_time_tool');
+    final names = builtInTools().map((t) => t.name).toSet();
+    expect(
+      names,
+      containsAll([
+        'calculate_tool',
+        'current_date_time_tool',
+        'web_search_tool',
+      ]),
+    );
   });
 }

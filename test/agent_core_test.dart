@@ -67,6 +67,21 @@ void main() {
         contains('sir'),
       );
     });
+
+    test('valid-user prompt keeps Python parity substrings', () {
+      const user = UserProfile(jarvisName: 'Tony', isFemale: false);
+      final prompt = buildBackgroundPrompt(validUser: true, user: user);
+      for (final needle in validUserPromptMustContain) {
+        expect(prompt, contains(needle), reason: 'missing: $needle');
+      }
+    });
+
+    test('hostile prompt keeps critical substrings', () {
+      final prompt = buildBackgroundPrompt(validUser: false, user: null);
+      for (final needle in hostilePromptMustContain) {
+        expect(prompt, contains(needle), reason: 'missing: $needle');
+      }
+    });
   });
 
   group('remote parity helpers', () {
