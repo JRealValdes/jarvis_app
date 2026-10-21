@@ -25,7 +25,7 @@ Deeper layout and remote API contract: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.
 
 ## Download
 
-👉 [Download APK](.app_release/jarvis_1.1.3.apk) *(stale name: built as **1.1.3**; app source is **1.3.0** — rebuild before relying on Auto/offline; see #4)*
+👉 [Download APK](.app_release/jarvis_1.1.3.apk) *(stale name: built as **1.1.3**; app source is **1.4.0** — rebuild before relying on Auto/offline + web search; see #4)*
 
 You may need to allow installation from unknown sources.
 
@@ -71,10 +71,23 @@ Android SDK / emulator setup is tracked in [#3](https://github.com/JRealValdes/j
 
 ---
 
+## Local vs remote tools
+
+| Capability | Local / offline | Remote (Jarvis Server) |
+|------------|-----------------|-------------------------|
+| Calc + current date/time | Yes | Yes |
+| Web search + public page read (DuckDuckGo; no API key) | Yes | Yes |
+| LinkedIn draft / reply examples | No | Yes |
+| Job preferences YAML | No | Yes |
+| Google Calendar | No | Yes |
+| Speech-to-text | No | Yes |
+
+Local system prompts follow Python butler + language + datetime/web-search guidance; server-only tools are called out so the on-device model does not invent side-effects.
+
 ## Features
 
 - Auto remote-preferred chat with ephemeral offline failover + banner
-- Local-only on-device Jarvis (welcome flow, disk history, reset, calc + datetime)
+- Local-only on-device Jarvis (welcome flow, disk history, reset, calc + datetime + web search)
 - Settings: Auto / Local / Remote, key & profile, remote login/logout
 - Remote chat + admin Session Manager (JWT `admin`, remote-only)
 - Remote client aligned with jarvis defaults (`GPT_4O_MINI`, boolean JWT `admin`)

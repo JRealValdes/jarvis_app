@@ -50,7 +50,7 @@ class OpenAiClient {
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw OpenAiException(
-          'OpenAI error ${response.statusCode}: ${_safeErrorBody(response.body)}',
+          _statusMessage(response.statusCode, response.body),
           statusCode: response.statusCode,
         );
       }
@@ -118,6 +118,19 @@ class OpenAiClient {
     }
 
     throw OpenAiException('Tool loop exceeded $maxToolRounds rounds');
+  }
+
+  static String _statusMessage(int statusCode, String body) {
+    switch (statusCode) {
+      case 401:
+        return 'Invalid OpenAI API key (401). Open Settings and paste a valid key.';
+      case 429:
+        return 'OpenAI rate limit exceeded (429). Try again shortly.';
+      case 403:
+        return 'OpenAI refused the request (403). Check key permissions and billing.';
+      default:
+        return 'OpenAI error $statusCode: ${_safeErrorBody(body)}';
+    }
   }
 
   static String _safeErrorBody(String body) {

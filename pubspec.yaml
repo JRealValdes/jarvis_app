@@ -2,7 +2,7 @@ name: jarvis_app
 description: "Jarvis assistant app."
 publish_to: 'none'
 
-version: 1.3.0
+version: 1.4.0
 
 environment:
   sdk: ^3.8.1
