@@ -26,7 +26,7 @@ ChatScreen
 
 `RemoteEndpoint` resolves the FastAPI base URL from Settings / Login (persisted). Auth (`/token`) and chat/admin calls share it; Basic vs Bearer headers stay in their callers.
 
-Optional NTH: if the primary URL fails with a transport error, one short-timeout retry against `AppConfig.lanFallbackBaseUrl` (`JARVIS_LAN_FALLBACK_URL`, default `http://jarvis-raspberry.local:8000`). Not discovery/gossip — no Firebase.
+Optional NTH: if the primary URL fails with a transport error, one short-timeout retry against `AppConfig.lanFallbackBaseUrl` (`JARVIS_LAN_FALLBACK_URL`, default `http://jarvis-raspberry.local:8000`).
 
 Credentials are split by concern (same Keystore backend):
 
@@ -57,7 +57,7 @@ Persistent banner while offline: messages will not be saved.
 
 ## Remote API contract (audited vs jarvis `main`)
 
-Requires a reachable Jarvis FastAPI at the operator-configured base URL (LAN today; Tailscale off-LAN in **#11** / [jarvis#31](https://github.com/JRealValdes/jarvis/issues/31)). Legacy Firebase `latest_url` / cloudflared gossip was removed with **#12** (backend [jarvis#30](https://github.com/JRealValdes/jarvis/issues/30)).
+Requires a reachable Jarvis FastAPI at the operator-configured base URL (LAN today; Tailscale off-LAN in **#11** / [jarvis#31](https://github.com/JRealValdes/jarvis/issues/31)).
 
 | Method | Path | Notes |
 |--------|------|-------|

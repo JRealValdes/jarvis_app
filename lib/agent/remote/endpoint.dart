@@ -1,13 +1,12 @@
 import '../../config/app_config.dart';
 import '../../data/secure_store.dart';
 
-/// Resolves the Jarvis FastAPI base URL from operator Settings (not Firebase).
+/// Resolves the Jarvis FastAPI base URL from operator Settings.
 class RemoteEndpoint {
   RemoteEndpoint({SecureStore? secureStore})
       : _store = secureStore ?? SecureStore();
 
   final SecureStore _store;
-  String? _cached;
 
   /// Normalize user/build input: trim, optional `http://`, no trailing slash.
   static String? normalize(String? raw) {
@@ -26,15 +25,12 @@ class RemoteEndpoint {
     return s;
   }
 
-  Future<String?> resolve({bool forceRefresh = false}) async {
-    if (!forceRefresh && _cached != null) return _cached;
-    final stored = await _store.getApiBaseUrl();
-    _cached = normalize(stored);
-    return _cached;
+  Future<String?> resolve() async {
+    return normalize(await _store.getApiBaseUrl());
   }
 
-  Future<String> requireBaseUrl({bool forceRefresh = false}) async {
-    final url = await resolve(forceRefresh: forceRefresh);
+  Future<String> requireBaseUrl() async {
+    final url = await resolve();
     if (url == null || url.isEmpty) {
       throw StateError(
         'Jarvis API base URL is missing. Set it in Settings (LAN IP or hostname).',
@@ -43,16 +39,14 @@ class RemoteEndpoint {
     return url;
   }
 
-  /// Parametrizable LAN fallback (`JARVIS_LAN_FALLBACK_URL`), if distinct.
-  Future<String?> fallbackBaseUrl() async {
-    final primary = await resolve();
+  /// Primary configured URL, then optional build-time LAN fallback (distinct).
+  Future<List<String>> candidateBases() async {
+    final primary = await requireBaseUrl();
+    final out = <String>[primary];
     final fb = normalize(AppConfig.lanFallbackBaseUrl);
-    if (fb == null || fb.isEmpty) return null;
-    if (primary != null && primary == fb) return null;
-    return fb;
-  }
-
-  void invalidateCache() {
-    _cached = null;
+    if (fb != null && fb != primary) {
+      out.add(fb);
+    }
+    return out;
   }
 }

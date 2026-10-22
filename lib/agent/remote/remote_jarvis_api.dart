@@ -72,17 +72,15 @@ class RemoteJarvisApi implements JarvisBackend, JarvisAdminBackend {
     Future<http.Response> Function(String base, Duration timeout) send, {
     required String label,
   }) async {
-    final bases = <String>[];
+    final List<String> bases;
     try {
-      bases.add(await _endpoint.requireBaseUrl());
+      bases = await _endpoint.candidateBases();
     } on StateError catch (e) {
       throw JarvisRemoteException(
         'Remote $label failed: $e',
         kind: RemoteFailureKind.transport,
       );
     }
-    final fb = await _endpoint.fallbackBaseUrl();
-    if (fb != null) bases.add(fb);
 
     Object? lastError;
     for (var i = 0; i < bases.length; i++) {

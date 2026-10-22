@@ -39,8 +39,12 @@ class AuthService {
   final Duration _timeout;
 
   Future<bool> login(String username, String password) async {
-    final bases = await _candidateBases();
-    if (bases.isEmpty) return false;
+    List<String> bases;
+    try {
+      bases = await _endpoint.candidateBases();
+    } on StateError {
+      return false;
+    }
 
     final basicAuth =
         'Basic ${base64Encode(utf8.encode('$username:$password'))}';
@@ -94,8 +98,10 @@ class AuthService {
       return TokenValidationResult.noToken;
     }
 
-    final bases = await _candidateBases();
-    if (bases.isEmpty) {
+    List<String> bases;
+    try {
+      bases = await _endpoint.candidateBases();
+    } on StateError {
       return TokenValidationResult.unreachable;
     }
 
@@ -105,10 +111,9 @@ class AuthService {
       final timeout =
           i == 0 ? _timeout : AppConfig.lanFallbackTimeout;
       try {
-        final uri = Uri.parse('$baseUrl/validate-token');
         final response = await _http
             .get(
-              uri,
+              Uri.parse('$baseUrl/validate-token'),
               headers: {
                 'Authorization': 'Bearer $token',
                 'Accept': 'application/json',
@@ -138,18 +143,6 @@ class AuthService {
       }
     }
     return lastTransport ?? TokenValidationResult.unreachable;
-  }
-
-  Future<List<String>> _candidateBases() async {
-    final out = <String>[];
-    try {
-      out.add(await _endpoint.requireBaseUrl());
-    } on StateError {
-      return out;
-    }
-    final fb = await _endpoint.fallbackBaseUrl();
-    if (fb != null) out.add(fb);
-    return out;
   }
 
   Future<Map<String, dynamic>?> getTokenData() async {
