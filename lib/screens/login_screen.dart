@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../agent/remote/endpoint.dart';
 import '../data/secure_store.dart';
 import '../agent/remote/auth_service.dart';
 import 'chat_screen.dart';
@@ -13,6 +14,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class LoginScreenState extends State<LoginScreen> {
+  final _baseUrlCtrl = TextEditingController();
   final _userCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _store = SecureStore();
@@ -27,21 +29,37 @@ class LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _baseUrlCtrl.dispose();
     _userCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _loadSavedCredentials() async {
+    final savedUrl = await _store.getApiBaseUrl();
     final savedUser = await _store.getUsername();
     final savedPass = await _store.getPassword();
     if (!mounted) return;
+    if (savedUrl != null) _baseUrlCtrl.text = savedUrl;
     if (savedUser != null) _userCtrl.text = savedUser;
     if (savedPass != null) _passCtrl.text = savedPass;
   }
 
   Future<void> _onLogin() async {
+    final normalized = RemoteEndpoint.normalize(_baseUrlCtrl.text);
+    if (normalized == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Set a valid API base URL (e.g. http://192.168.x.x:8000)'),
+        ),
+      );
+      return;
+    }
+
     setState(() => _busy = true);
+    await _store.setApiBaseUrl(normalized);
+    _baseUrlCtrl.text = normalized;
+
     final username = _userCtrl.text.trim();
     final password = _passCtrl.text;
     final ok = await _auth.login(username, password);
@@ -87,10 +105,21 @@ class LoginScreenState extends State<LoginScreen> {
           child: Column(
             children: [
               const Text(
-                'Connects to your home FastAPI via the Firebase-published URL. '
-                'For on-device chat without a PC, switch to Local in Settings.',
+                'Connects to your Jarvis FastAPI on the home LAN '
+                '(or Tailscale later). Set the API base URL below. '
+                'For on-device chat without a server, switch to Local in Settings.',
               ),
               const SizedBox(height: 16),
+              TextField(
+                controller: _baseUrlCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'API base URL',
+                  hintText: 'http://192.168.x.x:8000',
+                ),
+                keyboardType: TextInputType.url,
+                autocorrect: false,
+                enabled: !_busy,
+              ),
               TextField(
                 controller: _userCtrl,
                 decoration: const InputDecoration(labelText: 'User'),

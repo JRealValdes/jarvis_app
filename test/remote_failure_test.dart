@@ -17,11 +17,11 @@ void main() {
       );
     });
 
-    test('transport: missing Firebase URL StateError', () {
+    test('transport: missing base URL StateError', () {
       expect(
         classifyRemoteFailure(
           StateError(
-            'Jarvis API base URL is missing. Check Firebase jarvis/latest_url.',
+            'Jarvis API base URL is missing. Set it in Settings (LAN IP or hostname).',
           ),
         ),
         RemoteFailureKind.transport,
@@ -56,7 +56,7 @@ void main() {
     test('kindFromStatusCode', () {
       expect(kindFromStatusCode(401), RemoteFailureKind.auth);
       expect(kindFromStatusCode(403), RemoteFailureKind.auth);
-      expect(kindFromStatusCode(404), RemoteFailureKind.transport);
+      expect(kindFromStatusCode(404), RemoteFailureKind.other);
       expect(kindFromStatusCode(500), RemoteFailureKind.other);
     });
   });

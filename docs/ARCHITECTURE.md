@@ -8,10 +8,10 @@ Mobile client for [JRealValdes/jarvis](https://github.com/JRealValdes/jarvis).
 |-------|------|
 | `screens/` / `widgets/` | Presentation |
 | `agent/` | Backends + chat orchestration |
-| `agent/remote/` | FastAPI client, JWT auth, Firebase URL, failure classification |
+| `agent/remote/` | FastAPI client, JWT auth, configured base URL, failure classification |
 | `domain/` | Pure chat state, prompts, models |
 | `data/` | Secure storage, local credentials / remote session facades, message stores |
-| `config/` | Defaults (models, seed message, timeouts) |
+| `config/` | Defaults (models, seed message, timeouts, LAN fallback dart-define) |
 
 ```text
 ChatScreen
@@ -24,12 +24,14 @@ ChatScreen
                   └─ RemoteJarvisApi
 ```
 
-`RemoteEndpoint` is the single base-URL resolver (Firebase `jarvis/latest_url`). Auth (`/token`) and chat/admin calls share it; Basic vs Bearer headers stay in their callers.
+`RemoteEndpoint` resolves the FastAPI base URL from Settings / Login (persisted). Auth (`/token`) and chat/admin calls share it; Basic vs Bearer headers stay in their callers.
+
+Optional NTH: if the primary URL fails with a transport error, one short-timeout retry against `AppConfig.lanFallbackBaseUrl` (`JARVIS_LAN_FALLBACK_URL`, default `http://jarvis-raspberry.local:8000`). Not discovery/gossip — no Firebase.
 
 Credentials are split by concern (same Keystore backend):
 
 - `LocalCredentials` — OpenAI key, model, profile
-- `RemoteSession` — JWT + login autofill
+- `RemoteSession` — JWT + login autofill + API base URL
 
 Session Manager is **remote admin only** (JWT `admin` truthy), hidden while Auto is offline.
 
@@ -39,7 +41,7 @@ Session Manager is **remote admin only** (JWT `admin` truthy), hidden while Auto
 |------|------|-------------|
 | **Auto** (default) | Remote when reachable; offline OpenAI on transport failure | Offline turns ephemeral (memory only) |
 | **Local only** | On-device OpenAI | Disk (sqflite) |
-| **Remote only** | Home/cloud FastAPI | Server checkpointer |
+| **Remote only** | Home FastAPI (LAN base URL) | Server checkpointer |
 
 Histories are **never** merged across modes or across remote ↔ offline cutover.
 
@@ -47,7 +49,7 @@ Histories are **never** merged across modes or across remote ↔ offline cutover
 
 | Failure | Behavior |
 |---------|----------|
-| Timeout / socket / missing Firebase URL / stale tunnel | Enter offline if API key present; else Settings CTA |
+| Timeout / socket / missing base URL | Enter offline if API key present; else Settings CTA |
 | 401 / 403 | Auth error — do **not** enter offline |
 | Other HTTP (e.g. 500) | Surface as error — do **not** auto-offline |
 
@@ -55,7 +57,7 @@ Persistent banner while offline: messages will not be saved.
 
 ## Remote API contract (audited vs jarvis `main`)
 
-Requires a reachable Jarvis FastAPI whose URL is published to Firebase RTDB `jarvis/latest_url.url`.
+Requires a reachable Jarvis FastAPI at the operator-configured base URL (LAN today; Tailscale off-LAN in **#11** / [jarvis#31](https://github.com/JRealValdes/jarvis/issues/31)). Legacy Firebase `latest_url` / cloudflared gossip was removed with **#12** (backend [jarvis#30](https://github.com/JRealValdes/jarvis/issues/30)).
 
 | Method | Path | Notes |
 |--------|------|-------|
@@ -70,11 +72,11 @@ Requires a reachable Jarvis FastAPI whose URL is published to Firebase RTDB `jar
 
 JWT claims used by the app: `admin` (bool or legacy `1`), `real_name` (server-side thread default).
 
-Stale tunnel URLs: HTTP **404** or Cloudflare **1016** → refresh Firebase URL and retry once. Transport timeout: `AppConfig.remoteTransportTimeout` (8s).
+Transport timeout: `AppConfig.remoteTransportTimeout` (8s). LAN fallback timeout: `AppConfig.lanFallbackTimeout` (2s). Android cleartext HTTP is allowed for LAN `http://` bases.
 
 ## Versioning
 
-- App semver: `pubspec.yaml` (`1.4.0`).
+- App semver: `pubspec.yaml` (`1.5.0` after #12).
 - Sideload APK: `.app_release/jarvis_<version>.apk` via `tooling/build_apk.ps1` / skill `build-apk`.
 - Android `local.properties` `flutter.versionName` is gitignored and refreshed by Flutter tooling — ignore skew vs pubspec.
 

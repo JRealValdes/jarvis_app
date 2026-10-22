@@ -1,6 +1,6 @@
 # Local mobile testing (Windows)
 
-Recipe to run **jarvis_app** on an Android emulator or physical device. Desktop/web devices are fine for layout experiments, but they are **not** a substitute for secure storage, Firebase Android, or APK-shaped behavior.
+Recipe to run **jarvis_app** on an Android emulator or physical device. Desktop/web devices are fine for layout experiments, but they are **not** a substitute for secure storage or APK-shaped behavior.
 
 ## Prerequisites (one-time)
 
@@ -69,7 +69,7 @@ Hot reload: press `r` in the Flutter terminal; hot restart: `R`.
 1. App opens Setup (or Settings) when no OpenAI key/profile is stored.
 2. Enter API key + Jarvis name → chat loads.
 3. Confirm secure storage survives an app restart (key still present).
-4. **Remote / Auto online** additionally needs `android/app/google-services.json` and a reachable Jarvis API URL in Firebase RTDB `jarvis/latest_url`.
+4. **Remote / Auto online** additionally needs a configured **API base URL** (Settings or Login) pointing at a reachable Jarvis FastAPI on the LAN (emulator → host: `http://10.0.2.2:8000` if the API runs on the Windows machine).
 
 ## Physical device (USB)
 
@@ -80,7 +80,7 @@ Hot reload: press `r` in the Flutter terminal; hot restart: `R`.
 
 ## Secondary layout check (not a replacement)
 
-Chrome DevTools device mode (`flutter run -d chrome`) is useful for quick UI width checks only. It does **not** exercise Android Keystore, Firebase Android, or release APK packaging.
+Chrome DevTools device mode (`flutter run -d chrome`) is useful for quick UI width checks only. It does **not** exercise Android Keystore or release APK packaging.
 
 ## Android Gradle toolchain (repo)
 

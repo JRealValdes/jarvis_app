@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../agent/backend_factory.dart';
+import '../agent/remote/endpoint.dart';
 import '../app.dart';
 import '../data/secure_store.dart';
 import '../domain/models/jarvis_mode.dart';
@@ -19,6 +20,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final _store = SecureStore();
   final _auth = AuthService();
+  final _baseUrlCtrl = TextEditingController();
   JarvisMode _mode = JarvisMode.auto;
   String? _username;
   bool _loading = true;
@@ -29,15 +31,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _baseUrlCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
     final mode = await _store.getMode();
     final user = await _store.getUsername();
+    final baseUrl = await _store.getApiBaseUrl();
     if (!mounted) return;
     setState(() {
       _mode = mode;
       _username = user;
+      if (baseUrl != null) _baseUrlCtrl.text = baseUrl;
       _loading = false;
     });
+  }
+
+  Future<void> _saveBaseUrl() async {
+    final normalized = RemoteEndpoint.normalize(_baseUrlCtrl.text);
+    if (normalized == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter a valid http(s) URL with a host'),
+        ),
+      );
+      return;
+    }
+    await _store.setApiBaseUrl(normalized);
+    _baseUrlCtrl.text = normalized;
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('API base URL saved.')),
+    );
   }
 
   Future<void> _setMode(JarvisMode mode) async {
@@ -222,6 +250,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: TextField(
+                controller: _baseUrlCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'API base URL',
+                  hintText: 'http://192.168.x.x:8000',
+                  helperText:
+                      'LAN IP or hostname of Jarvis FastAPI. Off-LAN via Tailscale is #11.',
+                ),
+                keyboardType: TextInputType.url,
+                autocorrect: false,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.save_outlined),
+              title: const Text('Save API base URL'),
+              onTap: _saveBaseUrl,
+            ),
             ListTile(
               title: Text(
                 _username != null
@@ -229,7 +276,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     : 'Not logged in',
               ),
               subtitle: const Text(
-                'Firebase provides the API base URL. Home PC/tunnel must be up.',
+                'Jarvis API must be reachable at the base URL above.',
               ),
             ),
             ListTile(

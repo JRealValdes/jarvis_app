@@ -6,7 +6,7 @@ Mobile front-end for the Jarvis assistant ([Python backend](https://github.com/J
 |------|----------------|
 | **Auto (default)** | Prefer Jarvis Server when reachable; fall back to on-device OpenAI on transport failure. Offline turns are **ephemeral** (not saved; cleared on restart). |
 | **Local only** | On-device agent with disk-backed history. No home PC required. |
-| **Remote only** | FastAPI client only: JWT login, Firebase-published base URL. No offline failover. |
+| **Remote only** | FastAPI client only: JWT login against an operator-configured API base URL (LAN). No offline failover. |
 
 Offline failover requires an OpenAI API key in Settings. Auth failures (401) do **not** enter offline — log in again instead.
 
@@ -20,10 +20,10 @@ Deeper layout and remote API contract: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.
 | [#6](https://github.com/JRealValdes/jarvis_app/issues/6) | Local prompt/tool parity with Python — **done** |
 | [#3](https://github.com/JRealValdes/jarvis_app/issues/3) | Android emulator / device testing — **done** |
 | [#4](https://github.com/JRealValdes/jarvis_app/issues/4) | Cursor skill to build APK — **done** |
-| [#11](https://github.com/JRealValdes/jarvis_app/issues/11) | Configurable remote API base URL (LAN / Tailscale) |
-| [#12](https://github.com/JRealValdes/jarvis_app/issues/12) | Remove Firebase URL discovery + Cloudflare stale-tunnel handling |
+| [#12](https://github.com/JRealValdes/jarvis_app/issues/12) | Remove Firebase URL discovery; configured LAN base URL — **done** |
+| [#11](https://github.com/JRealValdes/jarvis_app/issues/11) | Tailscale / off-LAN remote access (after #12) |
 
-Mark a row **done** in this table when that issue ships (same PR / follow-up docs commit). Verification (unit tests + smoke) stays **inside** each issue — no separate test-only issue. Backend mirror: [jarvis#29](https://github.com/JRealValdes/jarvis/issues/29) (Pi/LAN), [#31](https://github.com/JRealValdes/jarvis/issues/31) (Tailscale), [#30](https://github.com/JRealValdes/jarvis/issues/30) (drop cloudflared/Firebase).
+Mark a row **done** in this table when that issue ships (same PR / follow-up docs commit). Verification (unit tests + smoke) stays **inside** each issue — no separate test-only issue. Backend mirror: [jarvis#29](https://github.com/JRealValdes/jarvis/issues/29) (Pi/LAN), [#30](https://github.com/JRealValdes/jarvis/issues/30) (drop cloudflared/Firebase — first), [#31](https://github.com/JRealValdes/jarvis/issues/31) (Tailscale — after #30).
 
 ---
 
@@ -47,9 +47,11 @@ flutter test
 
 On Windows, Flutter plugin builds may require **Developer Mode** (symlink support).
 
-3. **Auto (default):** configure OpenAI key + profile in Setup/Settings for offline capability; add Firebase `android/app/google-services.json` and log in when the server is up.
-4. **Local only:** Setup with OpenAI key + profile; Firebase not required.
-5. **Remote only:** Firebase config + reachable Jarvis API (`uv run jarvis api` or tunnel). URL must be in Firebase RTDB `jarvis/latest_url`.
+3. **Auto (default):** configure OpenAI key + profile in Setup/Settings for offline capability; set **API base URL** (LAN) in Settings or Login; log in when the server is up.
+4. **Local only:** Setup with OpenAI key + profile; no home server required.
+5. **Remote only:** reachable Jarvis API (`uv run jarvis api` on the Pi/LAN) and the same configured base URL (e.g. `http://192.168.x.x:8000`).
+
+Optional LAN fallback when the primary URL fails (short timeout): default `http://jarvis-raspberry.local:8000`, override with `--dart-define=JARVIS_LAN_FALLBACK_URL=...` (empty disables). Not a secret.
 
 ```bash
 flutter run
@@ -71,8 +73,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tooling/build_apk.ps1 -Remov
 
 ### Smoke-test: Auto / offline failover
 
-1. Set mode to **Auto**, save a valid OpenAI key, log in while the server is up → chat stays remote (no offline banner).
-2. Stop the server / break the tunnel → next send shows the offline banner; replies come from on-device OpenAI; restart the app → offline thread is gone.
+1. Set mode to **Auto**, save a valid OpenAI key, set API base URL, log in while the server is up → chat stays remote (no offline banner).
+2. Stop the server / break reachability → next send shows the offline banner; replies come from on-device OpenAI; restart the app → offline thread is gone.
 3. Remove the API key, stop the server → chat shows a Settings CTA (no silent offline).
 4. With a bad JWT (401) → auth error / login path; app does **not** flip to offline.
 
@@ -84,6 +86,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tooling/build_apk.ps1 -Remov
 - **Never** commit keys or bake them into the APK. Treat builds as personal / sideload until you have a proxy.
 - Calculator tool uses a restricted expression parser (not arbitrary code execution).
 - Offline failover **requires** this key and does **not** persist offline turns to disk.
+- API base URL is topology, not a credential; JWT + login password remain the secrets.
 
 ---
 
@@ -104,7 +107,7 @@ Local system prompts follow Python butler + language + datetime/web-search guida
 
 - Auto remote-preferred chat with ephemeral offline failover + banner
 - Local-only on-device Jarvis (welcome flow, disk history, reset, calc + datetime + web search)
-- Settings: Auto / Local / Remote, key & profile, remote login/logout
+- Settings: Auto / Local / Remote, key & profile, API base URL, remote login/logout
 - Remote chat + admin Session Manager (JWT `admin`, remote-only)
 - Remote client aligned with jarvis defaults (`GPT_4O_MINI`, boolean JWT `admin`)
 
@@ -130,5 +133,4 @@ Histories are **not** merged when switching modes or entering offline. See [docs
 - Flutter (Dart)
 - OpenAI Chat Completions (local / offline)
 - `flutter_secure_storage`, `sqflite`
-- Firebase Realtime Database (remote URL only)
-- Optional home FastAPI ([jarvis](https://github.com/JRealValdes/jarvis))
+- Optional home FastAPI ([jarvis](https://github.com/JRealValdes/jarvis)) on LAN (Tailscale off-LAN tracked in #11)

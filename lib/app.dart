@@ -7,7 +7,6 @@ import 'screens/chat_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/setup_screen.dart';
 import 'agent/remote/auth_service.dart';
-import 'agent/remote/firebase_service.dart';
 
 class JarvisApp extends StatelessWidget {
   const JarvisApp({super.key});
@@ -54,7 +53,7 @@ class _JarvisBootGateState extends State<JarvisBootGate> {
     }
 
     if (mode == JarvisMode.remote) {
-      await _routeRemoteOnly();
+      await _routeRemoteOnly(store);
       return;
     }
 
@@ -62,18 +61,15 @@ class _JarvisBootGateState extends State<JarvisBootGate> {
     await _routeAuto(store);
   }
 
-  Future<void> _routeRemoteOnly() async {
-    try {
-      await FirebaseService.ensureInit();
-    } catch (_) {
+  Future<void> _routeRemoteOnly(SecureStore store) async {
+    final auth = AuthService(secureStore: store);
+    final base = await store.getApiBaseUrl();
+    if (base == null || base.trim().isEmpty) {
       if (!mounted) return;
-      setState(() {
-        _home = const LoginScreen();
-      });
+      setState(() => _home = const LoginScreen());
       return;
     }
 
-    final auth = AuthService();
     final valid = await auth.validateToken();
     if (!valid) {
       await auth.logout();

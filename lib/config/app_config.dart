@@ -8,6 +8,19 @@ class AppConfig {
   /// Short probe / remote call timeout before treating the server as down.
   static const Duration remoteTransportTimeout = Duration(seconds: 8);
 
+  /// One-shot LAN mDNS/hostname fallback when the configured primary URL fails.
+  ///
+  /// Override at build time, e.g.:
+  /// `flutter run --dart-define=JARVIS_LAN_FALLBACK_URL=http://192.168.1.10:8000`
+  /// Empty string disables the fallback. Not a secret — LAN topology only.
+  static const String lanFallbackBaseUrl = String.fromEnvironment(
+    'JARVIS_LAN_FALLBACK_URL',
+    defaultValue: 'http://jarvis-raspberry.local:8000',
+  );
+
+  /// Tight timeout for the optional LAN fallback attempt (avoid mDNS hangs).
+  static const Duration lanFallbackTimeout = Duration(seconds: 2);
+
   /// OpenAI model id used when the user has not chosen one.
   static const String defaultOpenAiModel = 'gpt-4o-mini';
 

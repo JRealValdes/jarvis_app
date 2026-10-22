@@ -20,6 +20,7 @@ class SecureStore {
   static const _keyJwt = 'jwt_token';
   static const _keyUsername = 'username';
   static const _keyPassword = 'password';
+  static const _keyApiBaseUrl = 'api_base_url';
 
   Future<JarvisMode> getMode() async {
     final value = await _storage.read(key: _keyMode);
@@ -108,5 +109,16 @@ class SecureStore {
     await deleteJwtToken();
     await deleteUsername();
     await deletePassword();
+  }
+
+  /// Operator-configured Jarvis FastAPI base URL (LAN / Tailscale later).
+  Future<String?> getApiBaseUrl() => _storage.read(key: _keyApiBaseUrl);
+
+  Future<void> setApiBaseUrl(String url) async {
+    await _storage.write(key: _keyApiBaseUrl, value: url.trim());
+  }
+
+  Future<void> clearApiBaseUrl() async {
+    await _storage.delete(key: _keyApiBaseUrl);
   }
 }

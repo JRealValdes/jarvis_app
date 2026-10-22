@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 
 /// How a remote call failed — drives offline failover vs auth UX.
 enum RemoteFailureKind {
-  /// Connectivity, timeout, missing Firebase URL, DNS, etc.
+  /// Connectivity, timeout, missing base URL, DNS, etc.
   transport,
 
   /// 401 / 403 — do not enter offline; user must fix credentials.
@@ -48,9 +48,7 @@ RemoteFailureKind classifyRemoteFailure(Object error) {
   }
   if (error is StateError) {
     final msg = error.message;
-    if (msg.contains('base URL') ||
-        msg.contains('Firebase') ||
-        msg.contains('missing')) {
+    if (msg.contains('base URL') || msg.contains('missing')) {
       return RemoteFailureKind.transport;
     }
   }
@@ -60,10 +58,6 @@ RemoteFailureKind classifyRemoteFailure(Object error) {
 RemoteFailureKind kindFromStatusCode(int statusCode) {
   if (statusCode == 401 || statusCode == 403) {
     return RemoteFailureKind.auth;
-  }
-  // Tunnel / missing route after hop — treated as unreachable for failover.
-  if (statusCode == 404 || statusCode == 1016) {
-    return RemoteFailureKind.transport;
   }
   return RemoteFailureKind.other;
 }

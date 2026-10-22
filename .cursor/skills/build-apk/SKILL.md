@@ -13,7 +13,7 @@ description: >-
 ## Policy (v1)
 
 - **Personal sideload only** — release build uses the **debug keystore** (see `android/app/build.gradle.kts`). Not Play Store signing.
-- APKs under `.app_release/` **are tracked in git** for personal download convenience. Do not commit keystores, `google-services.json`, or API keys.
+- APKs under `.app_release/` **are tracked in git** for personal download convenience. Do not commit keystores or API keys.
 - **Never** bake an OpenAI API key into the binary. Local/offline keys are entered by the user at runtime (secure storage).
 
 ## Preconditions
