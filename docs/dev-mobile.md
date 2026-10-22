@@ -35,34 +35,37 @@ Optional gap: **Visual Studio** is only needed for *Windows desktop* builds — 
 | AVD | `jarvis_phone` (Pixel 6 form factor) |
 | User env | `ANDROID_HOME`, `ANDROID_SDK_ROOT`, `JAVA_HOME`, PATH additions |
 
-## Start the emulator
+## Start emulator + app (recommended)
+
+One shot from the repo root (cold-boots `jarvis_phone` if needed, waits for ADB, then `flutter run`):
 
 ```powershell
-flutter emulators
-flutter emulators --launch jarvis_phone
-# wait until:
-adb devices   # should show emulator-XXXX  device
+powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1
 ```
 
-### If the emulator stays `offline`
+Useful flags:
 
-On this host, a cold boot with software GPU is reliable:
+| Flag | Effect |
+|------|--------|
+| `-Uninstall` | `adb uninstall com.example.jarvis_app` before run (forces a clean install after branch/UI changes) |
+| `-BootOnly` | Only start/wait for the emulator; you run `flutter run` yourself |
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1 -Uninstall
+```
+
+Hot reload: press `r` in the Flutter terminal; hot restart: `R`; quit: `q`.
+
+### Manual steps (same as the script)
 
 ```powershell
 $sdk = "$env:LOCALAPPDATA\Android\Sdk"
 & "$sdk\emulator\emulator.exe" -avd jarvis_phone -no-snapshot-load -no-boot-anim -gpu swiftshader_indirect
+adb devices   # wait until emulator-XXXX  device
+flutter run -d emulator-5554
 ```
 
-WHPX acceleration is available (`emulator -accel-check`); snapshot/GPU quirks can still leave ADB offline until a cold boot.
-
-## Run the app
-
-```powershell
-flutter pub get
-flutter run -d emulator-5554   # or pick the id from `flutter devices`
-```
-
-Hot reload: press `r` in the Flutter terminal; hot restart: `R`.
+Cold boot + `swiftshader_indirect` avoids the common `offline` hang on this host. WHPX is available (`emulator -accel-check`) but snapshots/GPU can still leave ADB stuck until a cold boot.
 
 ### Smoke-check (Local / Auto offline)
 
