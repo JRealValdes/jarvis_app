@@ -1,4 +1,5 @@
 # Boot jarvis_phone (if needed), wait until ADB-ready, then flutter run.
+# Or power off a running AVD with -Kill.
 # Docs: docs/dev-mobile.md
 # Agent skill: .cursor/skills/run-emulator/SKILL.md
 #
@@ -7,11 +8,13 @@
 #   powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1 -Uninstall
 #   powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1 -BootOnly
 #   powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1 -DebugLogs
+#   powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1 -Kill
 param(
   [string]$AvdName = 'jarvis_phone',
   [switch]$Uninstall,
   [switch]$BootOnly,
   [switch]$DebugLogs,
+  [switch]$Kill,
   [int]$TimeoutSec = 300
 )
 
@@ -26,22 +29,69 @@ $sdkRoot = if ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT }
 
 $emulator = Join-Path $sdkRoot 'emulator\emulator.exe'
 $adb = Join-Path $sdkRoot 'platform-tools\adb.exe'
-if (-not (Test-Path $emulator)) {
-  throw "emulator.exe not found under $sdkRoot. Run tooling/setup_android_sdk.ps1 first."
-}
 if (-not (Test-Path $adb)) {
   throw "adb.exe not found under $sdkRoot. Run tooling/setup_android_sdk.ps1 first."
 }
 
+function Invoke-AdbText {
+  param(
+    [Parameter(Mandatory, ValueFromRemainingArguments = $true)]
+    [string[]]$AdbArgs
+  )
+  # adb often prints "daemon starting" on stderr; do not treat that as a terminating error.
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    $chunks = & $adb @AdbArgs 2>&1 | ForEach-Object {
+      if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message }
+      else { "$_" }
+    }
+    return ($chunks -join "`n")
+  } finally {
+    $ErrorActionPreference = $prev
+  }
+}
+
 function Get-EmulatorDeviceId {
-  $lines = & $adb devices 2>&1 | Out-String
-  $m = [regex]::Match($lines, '(emulator-\d+)\s+device\b')
+  $lines = Invoke-AdbText devices
+  $m = [regex]::Match($lines, '(emulator-\d+)\s+(?:device|offline|unauthorized)\b')
   if ($m.Success) { return $m.Groups[1].Value }
   return $null
 }
 
-function Test-EmulatorOnline {
-  return $null -ne (Get-EmulatorDeviceId)
+function Get-AllEmulatorSerials {
+  $lines = Invoke-AdbText devices
+  $found = [regex]::Matches($lines, '(emulator-\d+)\s+(?:device|offline|unauthorized)\b')
+  return @($found | ForEach-Object { $_.Groups[1].Value })
+}
+
+if ($Kill) {
+  if ($Uninstall -or $BootOnly -or $DebugLogs) {
+    throw '-Kill cannot be combined with -Uninstall, -BootOnly, or -DebugLogs.'
+  }
+  $serials = Get-AllEmulatorSerials
+  if ($serials.Count -eq 0) {
+    Write-Host 'No emulator listed in adb devices. Nothing to kill.'
+    exit 0
+  }
+  foreach ($serial in $serials) {
+    Write-Host "Killing $serial (adb emu kill)..."
+    $killOut = Invoke-AdbText @('-s', $serial, 'emu', 'kill')
+    if ($killOut.Trim()) { Write-Host $killOut }
+  }
+  Start-Sleep -Seconds 2
+  $left = Get-AllEmulatorSerials
+  if ($left.Count -eq 0) {
+    Write-Host 'Emulator stopped.'
+  } else {
+    Write-Host ("Still listed after kill: " + ($left -join ', ') + '. Close the emulator window or retry.')
+    exit 1
+  }
+  exit 0
+}
+
+if (-not (Test-Path $emulator)) {
+  throw "emulator.exe not found under $sdkRoot. Run tooling/setup_android_sdk.ps1 first."
 }
 
 function Wait-EmulatorReady {

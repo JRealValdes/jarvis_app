@@ -1,87 +1,123 @@
 ---
 name: run-emulator
 description: >-
-  Boots the jarvis_phone Android emulator and runs jarvis_app via
-  tooling/run_emulator.ps1 for frontend smoke/manual testing. Use when the
-  user asks to test the frontend, run the emulator, launch the app on
-  emulator/AVD, or phrases like "probar el frontend", "test frontend",
-  "run emulator", "abre el emulador".
+  Boots or stops the jarvis_phone Android emulator and runs jarvis_app via
+  tooling/run_emulator.ps1. Use when the user asks to test the frontend, run
+  the emulator, launch the app on emulator/AVD, close/stop/kill the emulator,
+  or phrases like "probar el frontend", "test frontend", "run emulator",
+  "abre el emulador", "cierra el emulador", "apaga el emulador", "adb emu kill".
 ---
 
-# Run emulator + jarvis_app (frontend test)
+# Run / stop emulator + jarvis_app (frontend test)
 
 ## When to use
 
-Operator asks to **test / try the Flutter frontend** on the Android emulator.
-This skill is the agent playbook; prefer the script over ad-hoc `flutter run`.
+| Intent | Action |
+|--------|--------|
+| Test / open frontend on emulator | Boot + `flutter run` (see Open) |
+| Close / shut down / kill the AVD | `-Kill` (see Close) |
+| Quit Flutter only, keep AVD warm | Tell operator to press `q` in the Flutter terminal (or stop that process); **do not** `-Kill` |
+
+Prefer the script over ad-hoc `flutter run` / `adb`.
 
 Human recipe: [docs/dev-mobile.md](../../../docs/dev-mobile.md).  
 APK sideload builds stay in skill **`build-apk`** (different trigger).
 
-## Debug logs (default: off)
+## Open (start)
+
+### Debug logs (default: off)
 
 | User intent | Action |
 |-------------|--------|
 | Unspecified / “probar el frontend” | Run **without** `-DebugLogs` |
-| Explicitly wants verbose Flutter output / debug logs | Pass **`-DebugLogs`** |
-
-**Always** when starting a quiet run: briefly remind the user they can ask for **debug logs** (`-DebugLogs`) next time if they need verbose `flutter run -v` output.
+| Explicitly wants verbose Flutter / debug logs | Pass **`-DebugLogs`** |
 
 Do not enable `-DebugLogs` unless they ask (or clearly want verbose logs).
 
-## Preconditions
+### Reminders (always, after starting a run)
 
-1. Work from the **jarvis_app** repo root (this skill lives there).
-2. Flutter + Android SDK healthy (`flutter doctor`; see `docs/dev-mobile.md`).
-3. AVD `jarvis_phone` exists (or run `tooling/setup_android_sdk.ps1` once).
-4. For **Remote / Auto online** smoke against Jarvis Server: API reachable from the emulator (LAN Pi IP, or host machine via `http://10.0.2.2:8000`).
+In the chat reply, briefly remind:
 
-## Preferred command (Windows)
+1. They can ask for **debug logs** next time (`-DebugLogs` / `flutter run -v`).
+2. They can ask you to **close the emulator** later (“cierra el emulador”) and you will run `-Kill` — no need to remember `adb` by hand.
 
-From the repo root:
+### Command
+
+From the **jarvis_app** repo root:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1
 ```
 
-With debug logs:
-
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1 -DebugLogs
 ```
 
-Useful flags:
-
 | Flag | Effect |
 |------|--------|
-| *(none)* | Quiet `flutter run` (default for this skill) |
-| `-DebugLogs` | `flutter run -v` (verbose) |
-| `-Uninstall` | Clean install (`adb uninstall com.example.jarvis_app`) before run |
-| `-BootOnly` | Start/wait for emulator only; do not `flutter run` |
+| *(none)* | Quiet `flutter run` (default) |
+| `-DebugLogs` | `flutter run -v` |
+| `-Uninstall` | Clean install before run |
+| `-BootOnly` | Start/wait for AVD only; no `flutter run` |
 
-Long-running: `flutter run` blocks until the user quits (`q`). Run it in a dedicated terminal; do not treat a hanging process as failure while the app is up.
+Long-running: `flutter run` blocks until quit. Use a dedicated terminal; a live app is not a failure.
+
+## Close (stop AVD)
+
+Triggers: “cierra el emulador”, “apaga el emulador”, “kill emulator”, “stop the AVD”, etc.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1 -Kill
+```
+
+This runs `adb -s <emulator> emu kill` (powers off the AVD window). Confirm in chat that the emulator is gone (`adb devices` empty of `emulator-*` if useful).
+
+**Flutter vs AVD:**
+
+| Ask | Do |
+|-----|-----|
+| Close / kill **emulator** | `-Kill` |
+| Stop **app / flutter run** only | Operator: `q` in Flutter terminal. Keep AVD up unless they also asked to close the emulator. |
+
+### Manual fallback (if script/`adb` fails)
+
+- Flutter: `q` in the `flutter run` terminal  
+- AVD: `adb emu kill` or close the emulator window  
+
+## Preconditions
+
+1. Work from the **jarvis_app** repo root.
+2. Flutter + Android SDK healthy (`flutter doctor`; see `docs/dev-mobile.md`).
+3. AVD `jarvis_phone` exists (or run `tooling/setup_android_sdk.ps1` once) — required for **open**, not for **kill**.
+4. Remote smoke: API reachable from the emulator (LAN Pi IP, or `http://10.0.2.2:8000` for host API).
 
 ## Agent checklist
 
+**Open:**
+
 ```
-- [ ] Confirmed jarvis_app root + Flutter/SDK OK (or report what’s missing)
-- [ ] Chose quiet vs -DebugLogs (default quiet; reminded user about debug option)
-- [ ] Ran tooling/run_emulator.ps1 (add -Uninstall only if clean install requested)
-- [ ] Reported emulator device id / that the app launch was started
-- [ ] If Remote smoke was in scope: noted API base URL expectation
+- [ ] jarvis_app root + Flutter/SDK OK (or report gap)
+- [ ] Quiet vs -DebugLogs (default quiet)
+- [ ] Ran run_emulator.ps1
+- [ ] Reminded: debug logs option + “ask me to close the emulator”
+- [ ] Reported device id / launch started
 ```
 
-## Chat reply template
+**Close:**
 
-After starting (or when handing off to the running terminal):
+```
+- [ ] Ran run_emulator.ps1 -Kill
+- [ ] Confirmed AVD stopped (or reported error + manual fallback)
+```
 
-- Emulator ready / `flutter run` started (device id if known)
-- Mode: quiet or debug logs
-- Reminder (quiet runs only): you can ask for **debug logs** next time (`-DebugLogs`)
-- Hot reload: `r` / restart: `R` / quit: `q` in the Flutter terminal
+## Chat reply templates
+
+**After open:** emulator ready / `flutter run` started; quiet or debug; reminders (debug logs + ask to close); hotkeys `r` / `R` / `q`.
+
+**After close:** AVD killed via `-Kill` (or fallback used).
 
 ## Out of scope
 
 - Building release APKs (`build-apk`)
 - iOS Simulator
-- Changing Jarvis Server secrets or Pi deploy (backend repo)
+- Jarvis Server secrets / Pi deploy (backend repo)

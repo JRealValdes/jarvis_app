@@ -61,10 +61,11 @@ flutter run
 
 ### How agents run the emulator
 
-Project skill: `.cursor/skills/run-emulator/` (triggers: “probar el frontend”, “test frontend”, “run emulator”). Default is quiet `flutter run`; ask for **debug logs** to pass `-DebugLogs` (`flutter run -v`).
+Project skill: `.cursor/skills/run-emulator/` (triggers: “probar el frontend”, “test frontend”, “run emulator”, “cierra el emulador”). Default is quiet `flutter run`; ask for **debug logs** (`-DebugLogs`) or **close the emulator** (`-Kill` / `adb emu kill`). Quit Flutter only with `q` to keep the AVD warm.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1 -Kill
 ```
 
 ### How agents build the APK
