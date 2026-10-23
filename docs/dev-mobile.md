@@ -49,10 +49,14 @@ Useful flags:
 |------|--------|
 | `-Uninstall` | `adb uninstall com.example.jarvis_app` before run (forces a clean install after branch/UI changes) |
 | `-BootOnly` | Only start/wait for the emulator; you run `flutter run` yourself |
+| `-DebugLogs` | Verbose Flutter output (`flutter run -v`); default is quiet |
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1 -Uninstall
+powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1 -DebugLogs
 ```
+
+Cursor agents: skill **`run-emulator`** (`.cursor/skills/run-emulator/`) — default quiet; pass `-DebugLogs` only when the operator asks for debug logs.
 
 Hot reload: press `r` in the Flutter terminal; hot restart: `R`; quit: `q`.
 

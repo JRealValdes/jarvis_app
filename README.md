@@ -59,6 +59,14 @@ flutter run
 
 **Phone / emulator on Windows:** see [docs/dev-mobile.md](docs/dev-mobile.md) (SDK bootstrap script, AVD `jarvis_phone`, cold-boot tip, USB debugging).
 
+### How agents run the emulator
+
+Project skill: `.cursor/skills/run-emulator/` (triggers: “probar el frontend”, “test frontend”, “run emulator”). Default is quiet `flutter run`; ask for **debug logs** to pass `-DebugLogs` (`flutter run -v`).
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1
+```
+
 ### How agents build the APK
 
 Project skill: `.cursor/skills/build-apk/` (triggers: “genera un nuevo apk”, “build apk”, “release android”).

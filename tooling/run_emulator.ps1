@@ -1,14 +1,17 @@
 # Boot jarvis_phone (if needed), wait until ADB-ready, then flutter run.
 # Docs: docs/dev-mobile.md
+# Agent skill: .cursor/skills/run-emulator/SKILL.md
 #
 # Usage (repo root):
 #   powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1
 #   powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1 -Uninstall
 #   powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1 -BootOnly
+#   powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1 -DebugLogs
 param(
   [string]$AvdName = 'jarvis_phone',
   [switch]$Uninstall,
   [switch]$BootOnly,
+  [switch]$DebugLogs,
   [int]$TimeoutSec = 300
 )
 
@@ -96,5 +99,11 @@ if (-not (Get-Command flutter -ErrorAction SilentlyContinue)) {
 
 Write-Host "flutter pub get..."
 flutter pub get
-Write-Host "flutter run -d $deviceId"
-flutter run -d $deviceId
+$flutterArgs = @('run', '-d', $deviceId)
+if ($DebugLogs) {
+  $flutterArgs += '-v'
+  Write-Host "flutter run -v -d $deviceId (debug logs)"
+} else {
+  Write-Host "flutter run -d $deviceId"
+}
+& flutter @flutterArgs
