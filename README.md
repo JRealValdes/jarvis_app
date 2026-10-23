@@ -29,7 +29,7 @@ Mark a row **done** in this table when that issue ships (same PR / follow-up doc
 
 ## Download
 
-👉 [Download APK](.app_release/jarvis_1.4.0.apk)
+👉 [Download APK](.app_release/jarvis_1.5.0.apk)
 
 You may need to allow installation from unknown sources.
 
