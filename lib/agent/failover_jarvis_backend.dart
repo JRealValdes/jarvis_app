@@ -61,6 +61,10 @@ class FailoverJarvisBackend implements JarvisBackend {
     _onEnteredOffline?.call();
   }
 
+  /// Manual cutover (soft-wait "Go offline") while a remote ask may still be in flight.
+  Future<void> forceEnterOffline() =>
+      _enterOffline(skipWelcome: _skipWelcomeOnCutover);
+
   Future<T> _remoteOrOffline<T>({
     required Future<T> Function() remoteOp,
     required Future<T> Function(LocalJarvisAgent offline) offlineOp,

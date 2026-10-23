@@ -5,8 +5,15 @@ class AppConfig {
   /// Default execution mode when nothing is stored yet.
   static const String defaultMode = 'auto';
 
-  /// Short probe / remote call timeout before treating the server as down.
+  /// Short probe / remote call timeout before treating the server as down
+  /// (login, history, reset — not LLM `/ask`).
   static const Duration remoteTransportTimeout = Duration(seconds: 8);
+
+  /// Hard ceiling for remote `/ask` (LLM turns can exceed the transport probe).
+  static const Duration remoteAskTimeout = Duration(seconds: 120);
+
+  /// After this wait on `/ask`, offer Keep waiting / Go offline (Auto).
+  static const Duration remoteAskSoftWait = Duration(seconds: 12);
 
   /// One-shot LAN mDNS/hostname fallback when the configured primary URL fails.
   ///

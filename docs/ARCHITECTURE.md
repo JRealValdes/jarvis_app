@@ -55,6 +55,8 @@ Histories are **never** merged across modes or across remote ↔ offline cutover
 
 Persistent banner while offline: messages will not be saved.
 
+Soft wait on `/ask`: after `remoteAskSoftWait` (12s), Auto shows *Keep waiting* / *Go offline*; hard ceiling is `remoteAskTimeout` (120s). Probe/auth/history stay on `remoteTransportTimeout` (8s).
+
 ## Remote API contract (audited vs jarvis `main`)
 
 Requires a reachable Jarvis FastAPI at the operator-configured base URL (LAN today; Tailscale off-LAN in **#11** / [jarvis#31](https://github.com/JRealValdes/jarvis/issues/31)).
@@ -72,7 +74,9 @@ Requires a reachable Jarvis FastAPI at the operator-configured base URL (LAN tod
 
 JWT claims used by the app: `admin` (bool or legacy `1`), `real_name` (server-side thread default).
 
-Transport timeout: `AppConfig.remoteTransportTimeout` (8s). LAN fallback timeout: `AppConfig.lanFallbackTimeout` (2s). Android cleartext HTTP is allowed for LAN `http://` bases.
+Timeouts: transport probe `remoteTransportTimeout` (8s); `/ask` `remoteAskTimeout` (120s) with soft-wait offer at `remoteAskSoftWait` (12s); LAN fallback `lanFallbackTimeout` (2s). Android cleartext HTTP is allowed for LAN `http://` bases.
+
+On-device web search scrapes DuckDuckGo HTML with `jarvisSearchUserAgent` (browser-like); page fetch keeps `jarvisWebUserAgent` (JarvisBot) for robots/policy. Backend search uses the `ddgs` package instead of HTML scraping.
 
 ## Versioning
 

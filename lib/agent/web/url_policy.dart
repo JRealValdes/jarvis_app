@@ -10,6 +10,11 @@ class UrlPolicyError implements Exception {
 const String jarvisWebUserAgent =
     'JarvisBot/0.1 (+https://github.com/JRealValdes/jarvis_app; public-read only)';
 
+/// Browser-like UA for DuckDuckGo HTML search only (JarvisBot is blocked).
+const String jarvisSearchUserAgent =
+    'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 '
+    '(KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36';
+
 const _blockedHostSuffixes = <String>[
   'glassdoor.com',
   'glassdoor.es',

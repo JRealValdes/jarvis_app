@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../config/app_config.dart';
 import '../data/secure_store.dart';
 import '../domain/models/jarvis_mode.dart';
@@ -22,8 +24,10 @@ class ChatController {
     BackendFactory? factory,
     SecureStore? secureStore,
     AuthService? auth,
+    Duration? askSoftWait,
   })  : _secureStore = secureStore ?? SecureStore(),
-        _auth = auth ?? AuthService() {
+        _auth = auth ?? AuthService(),
+        _askSoftWait = askSoftWait ?? AppConfig.remoteAskSoftWait {
     _factory = factory ??
         BackendFactory(
           secureStore: _secureStore,
@@ -36,6 +40,7 @@ class ChatController {
   late final BackendFactory _factory;
   final SecureStore _secureStore;
   final AuthService _auth;
+  final Duration _askSoftWait;
 
   final List<ChatBubble> messages = [];
 
@@ -52,6 +57,18 @@ class ChatController {
   /// Last send blocked because offline was needed and no API key is set.
   bool needsOfflineKey = false;
 
+  /// Soft-wait banner: server is slow on `/ask`.
+  bool slowRemoteOfferVisible = false;
+
+  /// Auto: show Go offline; Remote only: Keep waiting only.
+  bool get slowRemoteCanGoOffline =>
+      mode == JarvisMode.auto && !offlineActive;
+
+  int _askGeneration = 0;
+  String? _pendingAskPayload;
+  Timer? _softWaitTimer;
+  void Function()? _onUpdate;
+
   FailoverJarvisBackend? get _failover =>
       _backend is FailoverJarvisBackend ? _backend as FailoverJarvisBackend : null;
 
@@ -59,12 +76,10 @@ class ChatController {
     mode = await _secureStore.getMode();
     offlineActive = false;
     needsOfflineKey = false;
+    _clearSlowOffer();
     modelName = mode == JarvisMode.local
         ? await _secureStore.getOpenAiModel()
-        : mode == JarvisMode.remote
-            ? AppConfig.defaultRemoteModelEnum
-            : AppConfig.defaultRemoteModelEnum;
-    // Auto uses remote model enum while online; OpenAI id after cutover.
+        : AppConfig.defaultRemoteModelEnum;
     if (mode == JarvisMode.auto) {
       modelName = AppConfig.defaultRemoteModelEnum;
     }
@@ -74,7 +89,6 @@ class ChatController {
     onUpdate?.call();
     await refresh(onUpdate: onUpdate);
     _syncOfflineFlag();
-    // After cutover during refresh, switch model id for OpenAI.
     if (offlineActive && mode == JarvisMode.auto) {
       modelName = await _secureStore.getOpenAiModel();
     }
@@ -85,6 +99,62 @@ class ChatController {
     final f = _failover;
     if (f != null && f.offlineActive) {
       offlineActive = true;
+    }
+  }
+
+  void _clearSlowOffer() {
+    _softWaitTimer?.cancel();
+    _softWaitTimer = null;
+    slowRemoteOfferVisible = false;
+  }
+
+  void keepWaitingOnRemote({void Function()? onUpdate}) {
+    slowRemoteOfferVisible = false;
+    _softWaitTimer?.cancel();
+    _softWaitTimer = null;
+    (onUpdate ?? _onUpdate)?.call();
+  }
+
+  /// Auto: abandon in-flight remote ask and answer offline.
+  Future<void> switchToOfflineNow({void Function()? onUpdate}) async {
+    final notify = onUpdate ?? _onUpdate;
+    final failover = _failover;
+    final payload = _pendingAskPayload;
+    if (failover == null || payload == null || offlineActive) {
+      keepWaitingOnRemote(onUpdate: notify);
+      return;
+    }
+
+    _askGeneration++;
+    _clearSlowOffer();
+    try {
+      await failover.forceEnterOffline();
+    } on OfflineKeyRequiredException catch (e) {
+      needsOfflineKey = true;
+      messages.add(ChatBubble(text: e.message, isUser: false));
+      sending = false;
+      notify?.call();
+      return;
+    }
+
+    offlineActive = true;
+    modelName = await _secureStore.getOpenAiModel();
+    notify?.call();
+
+    try {
+      final responses = await failover.ask(payload, modelName: modelName);
+      for (final msg in responses) {
+        messages.add(ChatBubble(text: msg, isUser: false));
+      }
+    } on OfflineKeyRequiredException catch (e) {
+      needsOfflineKey = true;
+      messages.add(ChatBubble(text: e.message, isUser: false));
+    } catch (e) {
+      messages.add(ChatBubble(text: describeOpenAiError(e), isUser: false));
+    } finally {
+      sending = false;
+      _pendingAskPayload = null;
+      notify?.call();
     }
   }
 
@@ -170,7 +240,6 @@ class ChatController {
           onUpdate?.call();
           return;
         }
-        // Transport during reset: Failover may already have entered offline.
         _syncOfflineFlag();
         if (!offlineActive && isFailoverCandidate(e)) {
           messages.add(ChatBubble(text: 'Reset failed: $e', isUser: false));
@@ -191,12 +260,30 @@ class ChatController {
 
     sending = true;
     needsOfflineKey = false;
+    _pendingAskPayload = payload;
+    _onUpdate = onUpdate;
+    _clearSlowOffer();
+    final gen = ++_askGeneration;
     onUpdate?.call();
+
+    final useSoftWait = !offlineActive &&
+        (mode == JarvisMode.auto || mode == JarvisMode.remote) &&
+        !initial;
+
+    if (useSoftWait) {
+      _softWaitTimer = Timer(_askSoftWait, () {
+        if (gen != _askGeneration || !sending || offlineActive) return;
+        slowRemoteOfferVisible = true;
+        onUpdate?.call();
+      });
+    }
+
     try {
       if (offlineActive && mode == JarvisMode.auto) {
         modelName = await _secureStore.getOpenAiModel();
       }
       final responses = await backend.ask(payload, modelName: modelName);
+      if (gen != _askGeneration) return;
       _syncOfflineFlag();
       if (offlineActive && mode == JarvisMode.auto) {
         modelName = await _secureStore.getOpenAiModel();
@@ -205,9 +292,11 @@ class ChatController {
         messages.add(ChatBubble(text: msg, isUser: false));
       }
     } on OfflineKeyRequiredException catch (e) {
+      if (gen != _askGeneration) return;
       needsOfflineKey = true;
       messages.add(ChatBubble(text: e.message, isUser: false));
     } catch (e) {
+      if (gen != _askGeneration) return;
       if (classifyRemoteFailure(e) == RemoteFailureKind.auth) {
         messages.add(
           ChatBubble(
@@ -219,14 +308,20 @@ class ChatController {
         messages.add(ChatBubble(text: describeOpenAiError(e), isUser: false));
       }
     } finally {
-      sending = false;
-      onUpdate?.call();
+      if (gen == _askGeneration) {
+        _clearSlowOffer();
+        sending = false;
+        _pendingAskPayload = null;
+        onUpdate?.call();
+      }
     }
   }
 
   Future<void> resetChat({void Function()? onUpdate}) async {
     final backend = _backend;
     if (backend == null) return;
+    _askGeneration++;
+    _clearSlowOffer();
     await backend.resetSession();
     messages.clear();
     onUpdate?.call();

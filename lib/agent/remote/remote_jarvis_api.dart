@@ -19,15 +19,18 @@ class RemoteJarvisApi implements JarvisBackend, JarvisAdminBackend {
     RemoteEndpoint? endpoint,
     http.Client? httpClient,
     Duration? transportTimeout,
+    Duration? askTimeout,
   })  : _auth = auth ?? AuthService(),
         _endpoint = endpoint ?? RemoteEndpoint(),
         _http = httpClient ?? http.Client(),
-        _timeout = transportTimeout ?? AppConfig.remoteTransportTimeout;
+        _timeout = transportTimeout ?? AppConfig.remoteTransportTimeout,
+        _askTimeout = askTimeout ?? AppConfig.remoteAskTimeout;
 
   final AuthService _auth;
   final RemoteEndpoint _endpoint;
   final http.Client _http;
   final Duration _timeout;
+  final Duration _askTimeout;
 
   Future<http.Response> _get(
     String path, {
@@ -51,26 +54,32 @@ class RemoteJarvisApi implements JarvisBackend, JarvisAdminBackend {
   Future<http.Response> _post(
     String path, {
     Map<String, dynamic>? body,
+    Duration? timeoutOverride,
   }) async {
-    return _withBases((base, timeout) async {
-      final token = await _auth.getToken();
-      return _http
-          .post(
-            Uri.parse('$base$path'),
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Content-Type': 'application/json; charset=utf-8',
-              'Accept': 'application/json',
-            },
-            body: body != null ? json.encode(body) : null,
-          )
-          .timeout(timeout);
-    }, label: 'POST $path');
+    return _withBases(
+      (base, timeout) async {
+        final token = await _auth.getToken();
+        return _http
+            .post(
+              Uri.parse('$base$path'),
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Content-Type': 'application/json; charset=utf-8',
+                'Accept': 'application/json',
+              },
+              body: body != null ? json.encode(body) : null,
+            )
+            .timeout(timeout);
+      },
+      label: 'POST $path',
+      primaryTimeout: timeoutOverride,
+    );
   }
 
   Future<http.Response> _withBases(
     Future<http.Response> Function(String base, Duration timeout) send, {
     required String label,
+    Duration? primaryTimeout,
   }) async {
     final List<String> bases;
     try {
@@ -82,9 +91,10 @@ class RemoteJarvisApi implements JarvisBackend, JarvisAdminBackend {
       );
     }
 
+    final primary = primaryTimeout ?? _timeout;
     Object? lastError;
     for (var i = 0; i < bases.length; i++) {
-      final timeout = i == 0 ? _timeout : AppConfig.lanFallbackTimeout;
+      final timeout = i == 0 ? primary : AppConfig.lanFallbackTimeout;
       try {
         return await send(bases[i], timeout);
       } on TimeoutException catch (e) {
@@ -123,10 +133,14 @@ class RemoteJarvisApi implements JarvisBackend, JarvisAdminBackend {
 
   @override
   Future<List<String>> ask(String message, {required String modelName}) async {
-    final resp = await _post('/ask', body: {
-      'message': message,
-      'model_name': modelName,
-    });
+    final resp = await _post(
+      '/ask',
+      body: {
+        'message': message,
+        'model_name': modelName,
+      },
+      timeoutOverride: _askTimeout,
+    );
     _ensureOk(resp, 'Ask');
     final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
     return List<String>.from(decoded['response'] ?? []);
