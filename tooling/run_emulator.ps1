@@ -35,10 +35,12 @@ if (-not (Test-Path $adb)) {
 
 function Invoke-AdbText {
   param(
-    [Parameter(Mandatory, ValueFromRemainingArguments = $true)]
+    [Parameter(Mandatory)]
     [string[]]$AdbArgs
   )
   # adb often prints "daemon starting" on stderr; do not treat that as a terminating error.
+  # Call as: Invoke-AdbText -AdbArgs @('devices') — do not splat into this function
+  # (a leading '-s' would bind as a phantom parameter name).
   $prev = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
   try {
@@ -53,14 +55,20 @@ function Invoke-AdbText {
 }
 
 function Get-EmulatorDeviceId {
-  $lines = Invoke-AdbText devices
-  $m = [regex]::Match($lines, '(emulator-\d+)\s+(?:device|offline|unauthorized)\b')
+  # Only a fully online "device" is usable for flutter run / shell.
+  $lines = Invoke-AdbText -AdbArgs @('devices')
+  $m = [regex]::Match($lines, '(emulator-\d+)\s+device\b')
   if ($m.Success) { return $m.Groups[1].Value }
   return $null
 }
 
+function Test-AnyEmulatorListed {
+  $lines = Invoke-AdbText -AdbArgs @('devices')
+  return [regex]::IsMatch($lines, 'emulator-\d+\s+(?:device|offline|unauthorized)\b')
+}
+
 function Get-AllEmulatorSerials {
-  $lines = Invoke-AdbText devices
+  $lines = Invoke-AdbText -AdbArgs @('devices')
   $found = [regex]::Matches($lines, '(emulator-\d+)\s+(?:device|offline|unauthorized)\b')
   return @($found | ForEach-Object { $_.Groups[1].Value })
 }
@@ -76,7 +84,7 @@ if ($Kill) {
   }
   foreach ($serial in $serials) {
     Write-Host "Killing $serial (adb emu kill)..."
-    $killOut = Invoke-AdbText @('-s', $serial, 'emu', 'kill')
+    $killOut = Invoke-AdbText -AdbArgs @('-s', $serial, 'emu', 'kill')
     if ($killOut.Trim()) { Write-Host $killOut }
   }
   Start-Sleep -Seconds 2
@@ -100,8 +108,9 @@ function Wait-EmulatorReady {
   while ((Get-Date) -lt $deadline) {
     $id = Get-EmulatorDeviceId
     if ($id) {
-      $boot = (& $adb -s $id shell getprop sys.boot_completed 2>$null | Out-String).Trim()
-      if ($boot -eq '1') {
+      $boot = (Invoke-AdbText -AdbArgs @('-s', $id, 'shell', 'getprop', 'sys.boot_completed')).Trim()
+      # getprop may be buried if adb stderr was merged; accept a trailing 1.
+      if ($boot -eq '1' -or $boot -match '(?m)^1\s*$') {
         # Package manager can lag a few seconds after boot_completed.
         Start-Sleep -Seconds 3
         return $id
@@ -114,19 +123,22 @@ function Wait-EmulatorReady {
 
 $deviceId = Get-EmulatorDeviceId
 if (-not $deviceId) {
-  Write-Host "Starting AVD '$AvdName' (cold boot, swiftshader)..."
-  Start-Process -FilePath $emulator -ArgumentList @(
-    '-avd', $AvdName,
-    '-no-snapshot-load',
-    '-no-boot-anim',
-    '-gpu', 'swiftshader_indirect'
-  ) -WindowStyle Normal | Out-Null
+  if (-not (Test-AnyEmulatorListed)) {
+    Write-Host "Starting AVD '$AvdName' (cold boot, swiftshader)..."
+    Start-Process -FilePath $emulator -ArgumentList @(
+      '-avd', $AvdName,
+      '-no-snapshot-load',
+      '-no-boot-anim',
+      '-gpu', 'swiftshader_indirect'
+    ) -WindowStyle Normal | Out-Null
+  } else {
+    Write-Host "Emulator listed but not ready yet (offline); waiting..."
+  }
   $deviceId = Wait-EmulatorReady -Seconds $TimeoutSec
 } else {
-  Write-Host "Emulator already ready: $deviceId"
-  # Still wait if boot_completed is not set yet.
-  $boot = (& $adb -s $deviceId shell getprop sys.boot_completed 2>$null | Out-String).Trim()
-  if ($boot -ne '1') {
+  Write-Host "Emulator already online: $deviceId"
+  $boot = (Invoke-AdbText -AdbArgs @('-s', $deviceId, 'shell', 'getprop', 'sys.boot_completed')).Trim()
+  if (-not ($boot -eq '1' -or $boot -match '(?m)^1\s*$')) {
     $deviceId = Wait-EmulatorReady -Seconds $TimeoutSec
   }
 }

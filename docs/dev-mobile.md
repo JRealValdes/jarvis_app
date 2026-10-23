@@ -58,7 +58,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1 -De
 powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1 -Kill
 ```
 
-Cursor agents: skill **`run-emulator`** (`.cursor/skills/run-emulator/`) — default quiet; `-DebugLogs` only when asked; “cierra el emulador” → `-Kill`. Quit Flutter only with `q` (AVD stays up).
+Cursor agents: skill **`run-emulator`** (`.cursor/skills/run-emulator/`) — default quiet; `-DebugLogs` only when asked; start the script in the background and end the turn while it keeps running, so a later message can say “cierra el emulador” (`-Kill`) without pressing Stop. Quit Flutter only with `q` (AVD stays up).
 
 Hot reload: press `r` in the Flutter terminal; hot restart: `R`; quit Flutter: `q`. Stop the AVD: `-Kill` or `adb emu kill`.
 

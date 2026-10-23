@@ -39,7 +39,7 @@ Do not enable `-DebugLogs` unless they ask (or clearly want verbose logs).
 In the chat reply, briefly remind:
 
 1. They can ask for **debug logs** next time (`-DebugLogs` / `flutter run -v`).
-2. They can ask you to **close the emulator** later (“cierra el emulador”) and you will run `-Kill` — no need to remember `adb` by hand.
+2. They can ask you to **close the emulator** later (“cierra el emulador”) in a **new message**, and you will run `-Kill`. They do not need to press Stop to type. Stop aborts the run.
 
 ### Command
 
@@ -60,7 +60,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1 -De
 | `-Uninstall` | Clean install before run |
 | `-BootOnly` | Start/wait for AVD only; no `flutter run` |
 
-Long-running: `flutter run` blocks until quit. Use a dedicated terminal; a live app is not a failure.
+### Release the chat turn
+
+`flutter run` keeps its own terminal until quit. That process must not keep the chat turn open. If the turn stays open, the user cannot send “cierra el emulador” without pressing Stop, and Stop kills the run.
+
+When opening:
+
+1. Start the script in the **background** (`block_until_ms: 0`). Do not block until it exits.
+2. You may read that terminal **once**, after a few seconds, and report an immediate crash if you see one.
+3. Reply and **end the turn** while boot, Gradle, or `flutter run` is still going. Do not poll through the boot timeout or a live session.
+4. A later message can ask for status, debug logs, or to close the emulator. `-Kill` is short; wait for that one.
+
+A live app in the background terminal is success, not a reason to keep the turn open.
 
 ## Close (stop AVD)
 
@@ -98,9 +109,10 @@ This runs `adb -s <emulator> emu kill` (powers off the AVD window). Confirm in c
 ```
 - [ ] jarvis_app root + Flutter/SDK OK (or report gap)
 - [ ] Quiet vs -DebugLogs (default quiet)
-- [ ] Ran run_emulator.ps1
-- [ ] Reminded: debug logs option + “ask me to close the emulator”
-- [ ] Reported device id / launch started
+- [ ] Started run_emulator.ps1 in the background (turn not blocked on flutter run)
+- [ ] Ended the turn while the run was still going
+- [ ] Reminded: debug logs, and that a new message can close the emulator without pressing Stop
+- [ ] Reported device id / launch started, or that output was not ready yet and they can ask for status
 ```
 
 **Close:**
@@ -112,7 +124,7 @@ This runs `adb -s <emulator> emu kill` (powers off the AVD window). Confirm in c
 
 ## Chat reply templates
 
-**After open:** emulator ready / `flutter run` started; quiet or debug; reminders (debug logs + ask to close); hotkeys `r` / `R` / `q`.
+**After open:** the run is in the background and this turn is done; they can write again (status, debug logs, “cierra el emulador”) without pressing Stop. Mention the device id or `flutter run` if you already saw them. Hotkeys `r` / `R` / `q` in that terminal.
 
 **After close:** AVD killed via `-Kill` (or fallback used).
 
