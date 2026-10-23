@@ -184,6 +184,36 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ),
                   ),
+                if (_chat.slowRemoteOfferVisible)
+                  Material(
+                    color: Theme.of(context).colorScheme.tertiaryContainer,
+                    child: ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.hourglass_top),
+                      title: const Text(
+                        'The server is taking longer than usual. Switch to offline?',
+                      ),
+                      subtitle: _chat.slowRemoteCanGoOffline
+                          ? null
+                          : const Text('Remote-only mode cannot go offline.'),
+                      trailing: Wrap(
+                        spacing: 4,
+                        children: [
+                          TextButton(
+                            onPressed: () =>
+                                _chat.keepWaitingOnRemote(onUpdate: _rebuild),
+                            child: const Text('Keep waiting'),
+                          ),
+                          if (_chat.slowRemoteCanGoOffline)
+                            TextButton(
+                              onPressed: () =>
+                                  _chat.switchToOfflineNow(onUpdate: _rebuild),
+                              child: const Text('Go offline'),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
                 if (_chat.needsOfflineKey)
                   Material(
                     color: Theme.of(context).colorScheme.errorContainer,

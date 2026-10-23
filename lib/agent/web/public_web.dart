@@ -56,7 +56,7 @@ class PublicWebClient {
         .post(
           uri,
           headers: {
-            'User-Agent': jarvisWebUserAgent,
+            'User-Agent': jarvisSearchUserAgent,
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: {'q': cleaned},
@@ -67,7 +67,14 @@ class PublicWebClient {
       throw StateError('Search failed: HTTP ${response.statusCode}');
     }
 
-    return _parseDuckDuckGoHtml(utf8.decode(response.bodyBytes), limit);
+    final html = utf8.decode(response.bodyBytes);
+    final hits = _parseDuckDuckGoHtml(html, limit);
+    if (hits.isEmpty) {
+      throw StateError(
+        'Search returned no results (blocked or empty page).',
+      );
+    }
+    return hits;
   }
 
   Future<FetchedPage> fetchPage(String url) async {

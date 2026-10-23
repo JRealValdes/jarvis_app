@@ -8,7 +8,6 @@ import 'package:jwt_decoder/jwt_decoder.dart';
 import '../../config/app_config.dart';
 import '../../data/secure_store.dart';
 import 'endpoint.dart';
-import 'firebase_service.dart';
 import 'remote_failure.dart';
 
 /// Result of probing remote JWT validity (Auto-mode boot routing).
@@ -18,7 +17,7 @@ enum TokenValidationResult {
   noToken,
   /// Server returned 401/403 for a present token.
   invalidAuth,
-  /// Firebase / URL / network / timeout — candidate for offline.
+  /// Missing URL / network / timeout — candidate for offline.
   unreachable,
 }
 
@@ -30,7 +29,7 @@ class AuthService {
     http.Client? httpClient,
     Duration? transportTimeout,
   })  : _store = secureStore ?? SecureStore(),
-        _endpoint = endpoint ?? RemoteEndpoint(),
+        _endpoint = endpoint ?? RemoteEndpoint(secureStore: secureStore),
         _http = httpClient ?? http.Client(),
         _timeout = transportTimeout ?? AppConfig.remoteTransportTimeout;
 
@@ -40,42 +39,49 @@ class AuthService {
   final Duration _timeout;
 
   Future<bool> login(String username, String password) async {
+    List<String> bases;
     try {
-      await FirebaseService.ensureInit();
-    } catch (_) {
+      bases = await _endpoint.candidateBases();
+    } on StateError {
       return false;
     }
-    final baseUrl = await _endpoint.resolve(forceRefresh: true);
-    if (baseUrl == null) return false;
 
-    final uri = Uri.parse('$baseUrl/token');
     final basicAuth =
         'Basic ${base64Encode(utf8.encode('$username:$password'))}';
 
-    try {
-      final response = await _http
-          .post(
-            uri,
-            headers: {
-              'Authorization': basicAuth,
-              'Content-Type': 'application/json',
-            },
-          )
-          .timeout(_timeout);
+    for (var i = 0; i < bases.length; i++) {
+      final baseUrl = bases[i];
+      final timeout =
+          i == 0 ? _timeout : AppConfig.lanFallbackTimeout;
+      try {
+        final response = await _http
+            .post(
+              Uri.parse('$baseUrl/token'),
+              headers: {
+                'Authorization': basicAuth,
+                'Content-Type': 'application/json',
+              },
+            )
+            .timeout(timeout);
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body) as Map<String, dynamic>;
-        await _store.setJwtToken(data['access_token'] as String);
-        return true;
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body) as Map<String, dynamic>;
+          await _store.setJwtToken(data['access_token'] as String);
+          return true;
+        }
+        // Reachable but bad credentials — do not try fallback.
+        if (response.statusCode == 401 || response.statusCode == 403) {
+          return false;
+        }
+      } on TimeoutException {
+        continue;
+      } on SocketException {
+        continue;
+      } on http.ClientException {
+        continue;
       }
-      return false;
-    } on TimeoutException {
-      return false;
-    } on SocketException {
-      return false;
-    } on http.ClientException {
-      return false;
     }
+    return false;
   }
 
   Future<String?> getToken() => _store.getJwtToken();
@@ -87,62 +93,56 @@ class AuthService {
 
   /// Classifies why validation failed (auth vs transport).
   Future<TokenValidationResult> validateTokenDetailed() async {
-    try {
-      await FirebaseService.ensureInit();
-    } catch (_) {
-      return TokenValidationResult.unreachable;
-    }
-
     final token = await getToken();
     if (token == null || token.isEmpty) {
       return TokenValidationResult.noToken;
     }
 
-    String? baseUrl;
+    List<String> bases;
     try {
-      baseUrl = await _endpoint.resolve();
-    } catch (_) {
-      return TokenValidationResult.unreachable;
-    }
-    if (baseUrl == null || baseUrl.isEmpty) {
+      bases = await _endpoint.candidateBases();
+    } on StateError {
       return TokenValidationResult.unreachable;
     }
 
-    try {
-      final uri = Uri.parse('$baseUrl/validate-token');
-      final response = await _http
-          .get(
-            uri,
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Accept': 'application/json',
-            },
-          )
-          .timeout(_timeout);
+    TokenValidationResult? lastTransport;
+    for (var i = 0; i < bases.length; i++) {
+      final baseUrl = bases[i];
+      final timeout =
+          i == 0 ? _timeout : AppConfig.lanFallbackTimeout;
+      try {
+        final response = await _http
+            .get(
+              Uri.parse('$baseUrl/validate-token'),
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Accept': 'application/json',
+              },
+            )
+            .timeout(timeout);
 
-      if (response.statusCode == 200) {
-        return TokenValidationResult.valid;
+        if (response.statusCode == 200) {
+          return TokenValidationResult.valid;
+        }
+        if (response.statusCode == 401 || response.statusCode == 403) {
+          return TokenValidationResult.invalidAuth;
+        }
+        lastTransport = TokenValidationResult.unreachable;
+      } on TimeoutException {
+        lastTransport = TokenValidationResult.unreachable;
+      } on SocketException {
+        lastTransport = TokenValidationResult.unreachable;
+      } on http.ClientException {
+        lastTransport = TokenValidationResult.unreachable;
+      } catch (e) {
+        if (classifyRemoteFailure(e) == RemoteFailureKind.transport) {
+          lastTransport = TokenValidationResult.unreachable;
+        } else {
+          return TokenValidationResult.unreachable;
+        }
       }
-      if (response.statusCode == 401 || response.statusCode == 403) {
-        return TokenValidationResult.invalidAuth;
-      }
-      if (RemoteEndpoint.isStaleTunnelStatus(response.statusCode)) {
-        return TokenValidationResult.unreachable;
-      }
-      // Reachable but unexpected — treat as auth-ish only for 401 path above.
-      return TokenValidationResult.unreachable;
-    } on TimeoutException {
-      return TokenValidationResult.unreachable;
-    } on SocketException {
-      return TokenValidationResult.unreachable;
-    } on http.ClientException {
-      return TokenValidationResult.unreachable;
-    } catch (e) {
-      if (classifyRemoteFailure(e) == RemoteFailureKind.transport) {
-        return TokenValidationResult.unreachable;
-      }
-      return TokenValidationResult.unreachable;
     }
+    return lastTransport ?? TokenValidationResult.unreachable;
   }
 
   Future<Map<String, dynamic>?> getTokenData() async {

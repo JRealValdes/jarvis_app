@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -18,25 +19,27 @@ class RemoteJarvisApi implements JarvisBackend, JarvisAdminBackend {
     RemoteEndpoint? endpoint,
     http.Client? httpClient,
     Duration? transportTimeout,
+    Duration? askTimeout,
   })  : _auth = auth ?? AuthService(),
         _endpoint = endpoint ?? RemoteEndpoint(),
         _http = httpClient ?? http.Client(),
-        _timeout = transportTimeout ?? AppConfig.remoteTransportTimeout;
+        _timeout = transportTimeout ?? AppConfig.remoteTransportTimeout,
+        _askTimeout = askTimeout ?? AppConfig.remoteAskTimeout;
 
   final AuthService _auth;
   final RemoteEndpoint _endpoint;
   final http.Client _http;
   final Duration _timeout;
+  final Duration _askTimeout;
 
   Future<http.Response> _get(
     String path, {
     Map<String, String>? query,
   }) async {
-    try {
-      final base = await _endpoint.requireBaseUrl();
+    return _withBases((base, timeout) async {
       final token = await _auth.getToken();
       final uri = Uri.parse('$base$path').replace(queryParameters: query);
-      final response = await _http
+      return _http
           .get(
             uri,
             headers: {
@@ -44,53 +47,79 @@ class RemoteJarvisApi implements JarvisBackend, JarvisAdminBackend {
               'Accept': 'application/json',
             },
           )
-          .timeout(_timeout);
-      if (RemoteEndpoint.isStaleTunnelStatus(response.statusCode)) {
-        await _endpoint.requireBaseUrl(forceRefresh: true);
-        return await _get(path, query: query);
-      }
-      return response;
-    } on JarvisRemoteException {
-      rethrow;
-    } catch (e) {
-      throw JarvisRemoteException(
-        'Remote GET $path failed: $e',
-        kind: classifyRemoteFailure(e),
-      );
-    }
+          .timeout(timeout);
+    }, label: 'GET $path');
   }
 
   Future<http.Response> _post(
     String path, {
     Map<String, dynamic>? body,
+    Duration? timeoutOverride,
   }) async {
+    return _withBases(
+      (base, timeout) async {
+        final token = await _auth.getToken();
+        return _http
+            .post(
+              Uri.parse('$base$path'),
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Content-Type': 'application/json; charset=utf-8',
+                'Accept': 'application/json',
+              },
+              body: body != null ? json.encode(body) : null,
+            )
+            .timeout(timeout);
+      },
+      label: 'POST $path',
+      primaryTimeout: timeoutOverride,
+    );
+  }
+
+  Future<http.Response> _withBases(
+    Future<http.Response> Function(String base, Duration timeout) send, {
+    required String label,
+    Duration? primaryTimeout,
+  }) async {
+    final List<String> bases;
     try {
-      final base = await _endpoint.requireBaseUrl();
-      final token = await _auth.getToken();
-      final response = await _http
-          .post(
-            Uri.parse('$base$path'),
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Content-Type': 'application/json; charset=utf-8',
-              'Accept': 'application/json',
-            },
-            body: body != null ? json.encode(body) : null,
-          )
-          .timeout(_timeout);
-      if (RemoteEndpoint.isStaleTunnelStatus(response.statusCode)) {
-        await _endpoint.requireBaseUrl(forceRefresh: true);
-        return await _post(path, body: body);
-      }
-      return response;
-    } on JarvisRemoteException {
-      rethrow;
-    } catch (e) {
+      bases = await _endpoint.candidateBases();
+    } on StateError catch (e) {
       throw JarvisRemoteException(
-        'Remote POST $path failed: $e',
-        kind: classifyRemoteFailure(e),
+        'Remote $label failed: $e',
+        kind: RemoteFailureKind.transport,
       );
     }
+
+    final primary = primaryTimeout ?? _timeout;
+    Object? lastError;
+    for (var i = 0; i < bases.length; i++) {
+      final timeout = i == 0 ? primary : AppConfig.lanFallbackTimeout;
+      try {
+        return await send(bases[i], timeout);
+      } on TimeoutException catch (e) {
+        lastError = e;
+      } on SocketException catch (e) {
+        lastError = e;
+      } on http.ClientException catch (e) {
+        lastError = e;
+      } on JarvisRemoteException {
+        rethrow;
+      } catch (e) {
+        if (classifyRemoteFailure(e) == RemoteFailureKind.transport) {
+          lastError = e;
+          continue;
+        }
+        throw JarvisRemoteException(
+          'Remote $label failed: $e',
+          kind: classifyRemoteFailure(e),
+        );
+      }
+    }
+    throw JarvisRemoteException(
+      'Remote $label failed: $lastError',
+      kind: RemoteFailureKind.transport,
+    );
   }
 
   void _ensureOk(http.Response resp, String label) {
@@ -104,10 +133,14 @@ class RemoteJarvisApi implements JarvisBackend, JarvisAdminBackend {
 
   @override
   Future<List<String>> ask(String message, {required String modelName}) async {
-    final resp = await _post('/ask', body: {
-      'message': message,
-      'model_name': modelName,
-    });
+    final resp = await _post(
+      '/ask',
+      body: {
+        'message': message,
+        'model_name': modelName,
+      },
+      timeoutOverride: _askTimeout,
+    );
     _ensureOk(resp, 'Ask');
     final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
     return List<String>.from(decoded['response'] ?? []);

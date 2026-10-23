@@ -25,4 +25,10 @@ class RemoteSession {
   Future<void> deletePassword() => _store.deletePassword();
 
   Future<void> clear() => _store.clearRemoteCredentials();
+
+  Future<String?> getApiBaseUrl() => _store.getApiBaseUrl();
+
+  Future<void> setApiBaseUrl(String url) => _store.setApiBaseUrl(url);
+
+  Future<void> clearApiBaseUrl() => _store.clearApiBaseUrl();
 }

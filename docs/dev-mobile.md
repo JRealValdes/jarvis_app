@@ -1,6 +1,6 @@
 # Local mobile testing (Windows)
 
-Recipe to run **jarvis_app** on an Android emulator or physical device. Desktop/web devices are fine for layout experiments, but they are **not** a substitute for secure storage, Firebase Android, or APK-shaped behavior.
+Recipe to run **jarvis_app** on an Android emulator or physical device. Desktop/web devices are fine for layout experiments, but they are **not** a substitute for secure storage or APK-shaped behavior.
 
 ## Prerequisites (one-time)
 
@@ -35,41 +35,50 @@ Optional gap: **Visual Studio** is only needed for *Windows desktop* builds — 
 | AVD | `jarvis_phone` (Pixel 6 form factor) |
 | User env | `ANDROID_HOME`, `ANDROID_SDK_ROOT`, `JAVA_HOME`, PATH additions |
 
-## Start the emulator
+## Start emulator + app (recommended)
+
+One shot from the repo root (cold-boots `jarvis_phone` if needed, waits for ADB, then `flutter run`):
 
 ```powershell
-flutter emulators
-flutter emulators --launch jarvis_phone
-# wait until:
-adb devices   # should show emulator-XXXX  device
+powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1
 ```
 
-### If the emulator stays `offline`
+Useful flags:
 
-On this host, a cold boot with software GPU is reliable:
+| Flag | Effect |
+|------|--------|
+| `-Uninstall` | `adb uninstall com.example.jarvis_app` before run (forces a clean install after branch/UI changes) |
+| `-BootOnly` | Only start/wait for the emulator; you run `flutter run` yourself |
+| `-DebugLogs` | Verbose Flutter output (`flutter run -v`); default is quiet |
+| `-Kill` | Power off running emulator(s) via `adb emu kill` (no Flutter run) |
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1 -Uninstall
+powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1 -DebugLogs
+powershell -NoProfile -ExecutionPolicy Bypass -File tooling/run_emulator.ps1 -Kill
+```
+
+Cursor agents: skill **`run-emulator`** (`.cursor/skills/run-emulator/`) — default quiet; `-DebugLogs` only when asked; start the script in the background and end the turn while it keeps running, so a later message can say “cierra el emulador” (`-Kill`) without pressing Stop. Quit Flutter only with `q` (AVD stays up).
+
+Hot reload: press `r` in the Flutter terminal; hot restart: `R`; quit Flutter: `q`. Stop the AVD: `-Kill` or `adb emu kill`.
+
+### Manual steps (same as the script)
 
 ```powershell
 $sdk = "$env:LOCALAPPDATA\Android\Sdk"
 & "$sdk\emulator\emulator.exe" -avd jarvis_phone -no-snapshot-load -no-boot-anim -gpu swiftshader_indirect
+adb devices   # wait until emulator-XXXX  device
+flutter run -d emulator-5554
 ```
 
-WHPX acceleration is available (`emulator -accel-check`); snapshot/GPU quirks can still leave ADB offline until a cold boot.
-
-## Run the app
-
-```powershell
-flutter pub get
-flutter run -d emulator-5554   # or pick the id from `flutter devices`
-```
-
-Hot reload: press `r` in the Flutter terminal; hot restart: `R`.
+Cold boot + `swiftshader_indirect` avoids the common `offline` hang on this host. WHPX is available (`emulator -accel-check`) but snapshots/GPU can still leave ADB stuck until a cold boot.
 
 ### Smoke-check (Local / Auto offline)
 
 1. App opens Setup (or Settings) when no OpenAI key/profile is stored.
 2. Enter API key + Jarvis name → chat loads.
 3. Confirm secure storage survives an app restart (key still present).
-4. **Remote / Auto online** additionally needs `android/app/google-services.json` and a reachable Jarvis API URL in Firebase RTDB `jarvis/latest_url`.
+4. **Remote / Auto online** additionally needs a configured **API base URL** (Settings or Login) pointing at a reachable Jarvis FastAPI on the LAN (emulator → host: `http://10.0.2.2:8000` if the API runs on the Windows machine).
 
 ## Physical device (USB)
 
@@ -80,7 +89,7 @@ Hot reload: press `r` in the Flutter terminal; hot restart: `R`.
 
 ## Secondary layout check (not a replacement)
 
-Chrome DevTools device mode (`flutter run -d chrome`) is useful for quick UI width checks only. It does **not** exercise Android Keystore, Firebase Android, or release APK packaging.
+Chrome DevTools device mode (`flutter run -d chrome`) is useful for quick UI width checks only. It does **not** exercise Android Keystore or release APK packaging.
 
 ## Android Gradle toolchain (repo)
 

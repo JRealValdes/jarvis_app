@@ -1,31 +1,52 @@
-import 'firebase_service.dart';
+import '../../config/app_config.dart';
+import '../../data/secure_store.dart';
 
-/// Shared resolver for the published Jarvis FastAPI base URL.
+/// Resolves the Jarvis FastAPI base URL from operator Settings.
 class RemoteEndpoint {
-  RemoteEndpoint({FirebaseService? firebase})
-      : _firebase = firebase ?? FirebaseService();
+  RemoteEndpoint({SecureStore? secureStore})
+      : _store = secureStore ?? SecureStore();
 
-  final FirebaseService _firebase;
-  String? _baseUrl;
+  final SecureStore _store;
 
-  /// True when the response likely means the published tunnel URL is stale.
-  static bool isStaleTunnelStatus(int statusCode) =>
-      statusCode == 404 || statusCode == 1016;
-
-  Future<String?> resolve({bool forceRefresh = false}) async {
-    if (!forceRefresh && _baseUrl != null) return _baseUrl;
-    await FirebaseService.ensureInit();
-    _baseUrl = await _firebase.fetchApiBaseUrl();
-    return _baseUrl;
+  /// Normalize user/build input: trim, optional `http://`, no trailing slash.
+  static String? normalize(String? raw) {
+    if (raw == null) return null;
+    var s = raw.trim();
+    if (s.isEmpty) return null;
+    if (!s.contains('://')) {
+      s = 'http://$s';
+    }
+    while (s.endsWith('/')) {
+      s = s.substring(0, s.length - 1);
+    }
+    final uri = Uri.tryParse(s);
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty) return null;
+    if (uri.scheme != 'http' && uri.scheme != 'https') return null;
+    return s;
   }
 
-  Future<String> requireBaseUrl({bool forceRefresh = false}) async {
-    final url = await resolve(forceRefresh: forceRefresh);
+  Future<String?> resolve() async {
+    return normalize(await _store.getApiBaseUrl());
+  }
+
+  Future<String> requireBaseUrl() async {
+    final url = await resolve();
     if (url == null || url.isEmpty) {
       throw StateError(
-        'Jarvis API base URL is missing. Check Firebase jarvis/latest_url.',
+        'Jarvis API base URL is missing. Set it in Settings (LAN IP or hostname).',
       );
     }
     return url;
+  }
+
+  /// Primary configured URL, then optional build-time LAN fallback (distinct).
+  Future<List<String>> candidateBases() async {
+    final primary = await requireBaseUrl();
+    final out = <String>[primary];
+    final fb = normalize(AppConfig.lanFallbackBaseUrl);
+    if (fb != null && fb != primary) {
+      out.add(fb);
+    }
+    return out;
   }
 }
