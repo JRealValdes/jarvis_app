@@ -1,0 +1,67 @@
+---
+description: Jarvis app — feature branches tied to GitHub issues and PRs into main
+alwaysApply: true
+---
+
+# GitHub feature workflow (Jarvis app)
+
+Default delivery path: **feature branch → PR → `main`**. Every feature branch has a matching GitHub issue. All issue/PR/branch text is **English**.
+
+## Naming
+
+```
+feature/<issue-number>-<slug-from-issue-title>
+```
+
+- `<issue-number>` = GitHub issue number (e.g. `12`)
+- `<slug-from-issue-title>` = issue title adapted to a short kebab-case slug (lowercase, hyphens, no punctuation)
+
+Examples: issue `#12` “chore: remove Firebase URL discovery” → `feature/12-chore-remove-firebase-url-discovery`.
+
+## When on `main` and the user asks for a **new** change
+
+**Classify scope first** (backend / frontend / both), then **propose** (do not start until they confirm):
+
+1. Create GitHub issue(s) in the matching repo(s):
+   - **Frontend only** → issue in `JRealValdes/jarvis_app` (this repo)
+   - **Backend only** → issue in `JRealValdes/jarvis`
+   - **Both** → one issue in each repo (cross-link them)
+2. For work that belongs in **this** repo: create the associated feature branch from up-to-date `main` and develop there
+3. Backend-only work: create the issue in `jarvis` and stop here unless the user asks to continue in that repo
+
+Then follow [`.cursor/skills/github-feature-flow/SKILL.md`](../skills/github-feature-flow/SKILL.md) (section “Repo scope for new features”).
+
+## When on `main` and the user asks to solve / work on issue `#X`
+
+Do **not** create a new issue. Proceed (no need to re-propose the full flow):
+
+1. Read the issue with `gh issue view X` (title, body, checklist). Add `--repo JRealValdes/jarvis` when the issue is on the backend.
+2. Check out the existing development branch for `#X`, or create it if missing (`feature/X-<slug>` from up-to-date `main`) — only when working in this repo.
+3. Develop there against the issue requirements; expand the issue body when useful.
+
+Details: same skill file, section “Work on an existing issue”.
+
+## Already on a feature branch
+
+- Implement the requested changes on the current branch.
+- When new scope genuinely belongs on the same issue, **expand the issue body** (English) without asking — only when it adds clear value; do not spam trivial edits.
+
+## Pull requests
+
+- Create a PR only when the user asks.
+- Title ends with a space and `(#X)` where `X` is the issue number, e.g. `Remove Firebase URL discovery (#12)`.
+- Link the PR to the issue as development work (`Closes #X` or Development sidebar / `gh` linking). Body in English.
+
+## After merge — branch cleanup
+
+Once a PR is **merged**, the next expected step is to remove the feature branch.
+
+1. **Remote (`origin`)** — normally deleted by the user on the GitHub PR page (checkbox “Delete branch” / branch delete). If the remote branch is still present after merge, **propose** deleting it (`git push origin --delete feature/<N>-…` or `gh` equivalent) and wait for confirmation. Do not delete the remote branch unprompted.
+2. **Local** — after the remote branch is gone (or the user confirms they already deleted it), switch to `main`, then **ask for confirmation** before deleting the local feature branch (`git branch -d feature/<N>-…`). Prune stale remote-tracking refs (`git fetch --prune`) when useful.
+3. Leave the working tree on `main` and **`git pull`** (or `git pull origin main`) so local `main` matches the merge just landed.
+
+Prefer `git branch -d` (safe delete). After a squash/rebase merge, Git may claim the branch is “not fully merged”; if the PR is merged and the user confirmed cleanup, `git branch -D` is OK.
+
+## Out of scope here
+
+Commit message format stays Conventional Commits (see global incremental-commits rules). Do not push or open PRs unless the user requests it.
