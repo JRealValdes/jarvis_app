@@ -50,7 +50,10 @@ class LoginScreenState extends State<LoginScreen> {
     if (normalized == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Set a valid API base URL (e.g. http://192.168.x.x:8000)'),
+          content: Text(
+            'Set a valid API base URL '
+            '(e.g. http://192.168.x.x:8000 or http://100.x.y.z:8000)',
+          ),
         ),
       );
       return;
@@ -105,8 +108,9 @@ class LoginScreenState extends State<LoginScreen> {
           child: Column(
             children: [
               const Text(
-                'Connects to your Jarvis FastAPI on the home LAN '
-                '(or Tailscale later). Set the API base URL below. '
+                'Connects to your Jarvis FastAPI. On the home LAN use the Pi IP; '
+                'off-LAN install Tailscale on phone and Pi (same tailnet) and use '
+                'MagicDNS or a 100.x address — same port. '
                 'For on-device chat without a server, switch to Local in Settings.',
               ),
               const SizedBox(height: 16),
@@ -114,7 +118,9 @@ class LoginScreenState extends State<LoginScreen> {
                 controller: _baseUrlCtrl,
                 decoration: const InputDecoration(
                   labelText: 'API base URL',
-                  hintText: 'http://192.168.x.x:8000',
+                  hintText: RemoteEndpoint.urlFieldHint,
+                  helperText: RemoteEndpoint.urlFieldHelper,
+                  helperMaxLines: 3,
                 ),
                 keyboardType: TextInputType.url,
                 autocorrect: false,

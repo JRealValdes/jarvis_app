@@ -21,7 +21,8 @@ void main() {
       expect(
         classifyRemoteFailure(
           StateError(
-            'Jarvis API base URL is missing. Set it in Settings (LAN IP or hostname).',
+            'Jarvis API base URL is missing. Set it in Settings '
+            '(LAN IP or Tailscale MagicDNS / 100.x).',
           ),
         ),
         RemoteFailureKind.transport,

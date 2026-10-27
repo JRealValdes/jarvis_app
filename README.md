@@ -6,7 +6,7 @@ Mobile front-end for the Jarvis assistant ([Python backend](https://github.com/J
 |------|----------------|
 | **Auto (default)** | Prefer Jarvis Server when reachable; fall back to on-device OpenAI on transport failure. Offline turns are **ephemeral** (not saved; cleared on restart). |
 | **Local only** | On-device agent with disk-backed history. No home PC required. |
-| **Remote only** | FastAPI client only: JWT login against an operator-configured API base URL (LAN). No offline failover. |
+| **Remote only** | FastAPI client only: JWT login against an operator-configured API base URL (LAN or Tailscale). No offline failover. |
 
 Offline failover requires an OpenAI API key in Settings. Auth failures (401) do **not** enter offline — log in again instead.
 
@@ -21,7 +21,7 @@ Deeper layout and remote API contract: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.
 | [#3](https://github.com/JRealValdes/jarvis_app/issues/3) | Android emulator / device testing — **done** |
 | [#4](https://github.com/JRealValdes/jarvis_app/issues/4) | Cursor skill to build APK — **done** |
 | [#12](https://github.com/JRealValdes/jarvis_app/issues/12) | Remove Firebase URL discovery; configured LAN base URL — **done** |
-| [#11](https://github.com/JRealValdes/jarvis_app/issues/11) | Tailscale / off-LAN remote access (after #12) |
+| [#11](https://github.com/JRealValdes/jarvis_app/issues/11) | Tailscale / off-LAN remote access (after #12) — **done** |
 
 Mark a row **done** in this table when that issue ships (same PR / follow-up docs commit). Verification (unit tests + smoke) stays **inside** each issue — no separate test-only issue. Backend mirror: [jarvis#29](https://github.com/JRealValdes/jarvis/issues/29) (Pi/LAN), [#30](https://github.com/JRealValdes/jarvis/issues/30) (drop cloudflared/Firebase — first), [#31](https://github.com/JRealValdes/jarvis/issues/31) (Tailscale — after #30).
 
@@ -47,9 +47,9 @@ flutter test
 
 On Windows, Flutter plugin builds may require **Developer Mode** (symlink support).
 
-3. **Auto (default):** configure OpenAI key + profile in Setup/Settings for offline capability; set **API base URL** (LAN) in Settings or Login; log in when the server is up.
+3. **Auto (default):** configure OpenAI key + profile in Setup/Settings for offline capability; set **API base URL** (LAN or Tailscale) in Settings or Login; log in when the server is up.
 4. **Local only:** Setup with OpenAI key + profile; no home server required.
-5. **Remote only:** reachable Jarvis API (`uv run jarvis api` on the Pi/LAN) and the same configured base URL (e.g. `http://192.168.x.x:8000`).
+5. **Remote only:** reachable Jarvis API (`uv run jarvis api` on the Pi) and the same configured base URL (e.g. `http://192.168.x.x:8000` on LAN, or a Tailscale `100.x` / MagicDNS URL off-LAN).
 
 Optional LAN fallback when the primary URL fails (short timeout): default `http://jarvis-raspberry.local:8000`, override with `--dart-define=JARVIS_LAN_FALLBACK_URL=...` (empty disables). Not a secret.
 
@@ -86,6 +86,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tooling/build_apk.ps1 -Remov
 2. Stop the server / break reachability → next send shows the offline banner; replies come from on-device OpenAI; restart the app → offline thread is gone.
 3. Remove the API key, stop the server → chat shows a Settings CTA (no silent offline).
 4. With a bad JWT (401) → auth error / login path; app does **not** flip to offline.
+
+### Off-LAN remote access (Tailscale)
+
+Jarvis does **not** discover URLs via Firebase or ephemeral quick tunnels. Off-LAN reachability is host-layer [Tailscale](https://tailscale.com/) (backend: [jarvis#31](https://github.com/JRealValdes/jarvis/issues/31) / [raspberry-pi-ops — Off-LAN](https://github.com/JRealValdes/jarvis/blob/main/docs/raspberry-pi-ops.md#off-lan-access-tailscale-31)). Named Cloudflare Tunnel is a documented alternative only; prefer Tailscale.
+
+1. On the **Pi**: install Tailscale, `sudo tailscale up`, note `tailscale ip -4` (e.g. `100.113.255.4`) or enable MagicDNS (e.g. `jarvis-raspberry`).
+2. On the **phone**: install the Tailscale app, join the **same** tailnet, enable auto-connect / always-on VPN.
+3. In Jarvis **Settings** or **Login**, set **API base URL** to the same port as LAN (default `8000`), for example:
+   - `http://100.113.255.4:8000` (Tailscale IPv4)
+   - `http://jarvis-raspberry:8000` (MagicDNS, if enabled)
+4. Log in with normal Jarvis credentials (JWT). Tailscale only solves reachability.
+5. Smoke while **off** home Wi‑Fi (mobile data): Remote or Auto chat against that base URL. If the tailnet host is down and an OpenAI key is set, Auto still follows the offline failover rules above.
+
+Do **not** port-forward `:8000`, embed a Tailscale SDK in the app, or bring back Firebase / `*.trycloudflare.com` quick tunnels.
 
 ---
 
@@ -142,4 +156,4 @@ Histories are **not** merged when switching modes or entering offline. See [docs
 - Flutter (Dart)
 - OpenAI Chat Completions (local / offline)
 - `flutter_secure_storage`, `sqflite`
-- Optional home FastAPI ([jarvis](https://github.com/JRealValdes/jarvis)) on LAN (Tailscale off-LAN tracked in #11)
+- Optional home FastAPI ([jarvis](https://github.com/JRealValdes/jarvis)) on LAN or Tailscale (off-LAN)
