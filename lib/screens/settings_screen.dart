@@ -256,9 +256,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 controller: _baseUrlCtrl,
                 decoration: const InputDecoration(
                   labelText: 'API base URL',
-                  hintText: 'http://192.168.x.x:8000',
-                  helperText:
-                      'LAN IP or hostname of Jarvis FastAPI. Off-LAN via Tailscale is #11.',
+                  hintText: RemoteEndpoint.urlFieldHint,
+                  helperText: RemoteEndpoint.urlFieldHelper,
+                  helperMaxLines: 3,
                 ),
                 keyboardType: TextInputType.url,
                 autocorrect: false,
@@ -276,7 +276,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     : 'Not logged in',
               ),
               subtitle: const Text(
-                'Jarvis API must be reachable at the base URL above.',
+                'Jarvis API must be reachable at the base URL above '
+                '(home LAN or Tailscale). Auth is still Jarvis JWT.',
               ),
             ),
             ListTile(

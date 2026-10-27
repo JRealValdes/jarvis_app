@@ -8,6 +8,14 @@ class RemoteEndpoint {
 
   final SecureStore _store;
 
+  /// Hint for the API base URL field (LAN or Tailscale).
+  static const urlFieldHint = 'http://192.168.x.x:8000 or http://100.x.y.z:8000';
+
+  /// Helper under Settings / Login base URL fields.
+  static const urlFieldHelper =
+      'Home LAN IP, or Tailscale MagicDNS / 100.x (same port). '
+      'Install the Tailscale app on the phone; no Firebase or quick tunnels.';
+
   /// Normalize user/build input: trim, optional `http://`, no trailing slash.
   static String? normalize(String? raw) {
     if (raw == null) return null;
@@ -33,7 +41,8 @@ class RemoteEndpoint {
     final url = await resolve();
     if (url == null || url.isEmpty) {
       throw StateError(
-        'Jarvis API base URL is missing. Set it in Settings (LAN IP or hostname).',
+        'Jarvis API base URL is missing. Set it in Settings '
+        '(LAN IP or Tailscale MagicDNS / 100.x).',
       );
     }
     return url;

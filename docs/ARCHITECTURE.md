@@ -35,13 +35,27 @@ Credentials are split by concern (same Keystore backend):
 
 Session Manager is **remote admin only** (JWT `admin` truthy), hidden while Auto is offline.
 
+## Off-LAN reachability (Tailscale) (#11)
+
+The app stores a single operator-configured base URL. It does **not** embed Tailscale, Firebase URL gossip, or ephemeral tunnel clients.
+
+| Path | Base URL examples | Notes |
+|------|-------------------|--------|
+| Home LAN | `http://192.168.x.x:8000` | Same as #12 |
+| Off-LAN (default) | `http://100.x.y.z:8000` or MagicDNS `http://jarvis-raspberry:8000` | Phone + Pi on the same tailnet; Tailscale app auto-connect |
+| Alternative | Named Cloudflare Tunnel `https://…` | Documented on the backend only; no quick tunnels |
+
+Auth remains Jarvis JWT against that base. Unreachable Tailscale host → same transport classification as an unreachable LAN host → Auto offline rules (#5) when an OpenAI key is set.
+
+Operator steps: [README — Off-LAN](../README.md#off-lan-remote-access-tailscale) and backend [raspberry-pi-ops — Off-LAN](https://github.com/JRealValdes/jarvis/blob/main/docs/raspberry-pi-ops.md#off-lan-access-tailscale-31) ([jarvis#31](https://github.com/JRealValdes/jarvis/issues/31)).
+
 ## Modes
 
 | Mode | When | Persistence |
 |------|------|-------------|
 | **Auto** (default) | Remote when reachable; offline OpenAI on transport failure | Offline turns ephemeral (memory only) |
 | **Local only** | On-device OpenAI | Disk (sqflite) |
-| **Remote only** | Home FastAPI (LAN base URL) | Server checkpointer |
+| **Remote only** | Home FastAPI (LAN or Tailscale base URL) | Server checkpointer |
 
 Histories are **never** merged across modes or across remote ↔ offline cutover.
 
@@ -59,7 +73,7 @@ Soft wait on `/ask`: after `remoteAskSoftWait` (12s), Auto shows *Keep waiting* 
 
 ## Remote API contract (audited vs jarvis `main`)
 
-Requires a reachable Jarvis FastAPI at the operator-configured base URL (LAN today; Tailscale off-LAN in **#11** / [jarvis#31](https://github.com/JRealValdes/jarvis/issues/31)).
+Requires a reachable Jarvis FastAPI at the operator-configured base URL (home LAN or Tailscale MagicDNS / `100.x`; see **#11** / [jarvis#31](https://github.com/JRealValdes/jarvis/issues/31)).
 
 | Method | Path | Notes |
 |--------|------|-------|
@@ -74,7 +88,7 @@ Requires a reachable Jarvis FastAPI at the operator-configured base URL (LAN tod
 
 JWT claims used by the app: `admin` (bool or legacy `1`), `real_name` (server-side thread default).
 
-Timeouts: transport probe `remoteTransportTimeout` (8s); `/ask` `remoteAskTimeout` (120s) with soft-wait offer at `remoteAskSoftWait` (12s); LAN fallback `lanFallbackTimeout` (2s). Android cleartext HTTP is allowed for LAN `http://` bases.
+Timeouts: transport probe `remoteTransportTimeout` (8s); `/ask` `remoteAskTimeout` (120s) with soft-wait offer at `remoteAskSoftWait` (12s); LAN fallback `lanFallbackTimeout` (2s). Android cleartext HTTP is allowed for LAN and Tailscale `http://` bases.
 
 On-device web search scrapes DuckDuckGo HTML with `jarvisSearchUserAgent` (browser-like); page fetch keeps `jarvisWebUserAgent` (JarvisBot) for robots/policy. Backend search uses the `ddgs` package instead of HTML scraping.
 

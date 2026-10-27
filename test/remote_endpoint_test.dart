@@ -18,6 +18,17 @@ void main() {
       );
     });
 
+    test('accepts Tailscale IPv4 and MagicDNS-style hosts', () {
+      expect(
+        RemoteEndpoint.normalize('http://100.113.255.4:8000'),
+        'http://100.113.255.4:8000',
+      );
+      expect(
+        RemoteEndpoint.normalize('jarvis-raspberry:8000'),
+        'http://jarvis-raspberry:8000',
+      );
+    });
+
     test('rejects empty and non-http schemes', () {
       expect(RemoteEndpoint.normalize(''), isNull);
       expect(RemoteEndpoint.normalize('   '), isNull);

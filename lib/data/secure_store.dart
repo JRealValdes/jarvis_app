@@ -111,7 +111,7 @@ class SecureStore {
     await deletePassword();
   }
 
-  /// Operator-configured Jarvis FastAPI base URL (LAN / Tailscale later).
+  /// Operator-configured Jarvis FastAPI base URL (LAN or Tailscale).
   Future<String?> getApiBaseUrl() => _storage.read(key: _keyApiBaseUrl);
 
   Future<void> setApiBaseUrl(String url) async {
