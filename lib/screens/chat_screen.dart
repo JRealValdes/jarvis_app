@@ -1,7 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../agent/chat_controller.dart';
+import '../agent/remote/remote_jarvis_api.dart';
+import '../agent/speech/composer_mic_controller.dart';
+import '../agent/speech/mic_clip_path.dart';
+import '../agent/speech/openai_whisper_client.dart';
+import '../agent/speech/prompt_text.dart';
+import '../agent/speech/prompt_transcriber.dart';
+import '../agent/speech/record_mic_session.dart';
+import '../agent/speech/speech_route.dart';
+import '../agent/speech/transcription_errors.dart';
+import '../data/secure_store.dart';
 import '../domain/models/jarvis_mode.dart';
+import '../widgets/chat_composer.dart';
 import '../widgets/chat_message_bubble.dart';
 import 'login_screen.dart';
 import 'session_manager_screen.dart';
@@ -19,6 +32,10 @@ class _ChatScreenState extends State<ChatScreen> {
   final _input = TextEditingController();
   final _focusNode = FocusNode();
   final _scrollController = ScrollController();
+  final _store = SecureStore();
+  late final ComposerMicController _mic;
+  final _micWatch = Stopwatch();
+  Timer? _micTicker;
   bool _wasAtBottom = true;
   bool _offlineSnackShown = false;
 
@@ -41,6 +58,22 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _mic = ComposerMicController(
+      session: RecordMicSession(),
+      transcriber: PromptTranscriber(
+        remote: RemoteAudioTranscriber(RemoteJarvisApi()),
+        localForKey: (key) => OpenAiWhisperClient(apiKey: key),
+      ),
+      readContext: () async => SpeechContext(
+        mode: _chat.mode,
+        offlineActive: _chat.offlineActive,
+        openAiApiKey: await _store.getOpenAiApiKey(),
+      ),
+      newClipPath: newMicClipPath,
+      onUpdate: () {
+        if (mounted) setState(() {});
+      },
+    );
     _scrollController.addListener(() {
       final max = _scrollController.position.maxScrollExtent;
       final current = _scrollController.position.pixels;
@@ -58,6 +91,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _micTicker?.cancel();
+    unawaited(_mic.dispose());
     _scrollController.dispose();
     _focusNode.dispose();
     _input.dispose();
@@ -81,7 +116,96 @@ class _ChatScreenState extends State<ChatScreen> {
     await _chat.send(text: text, onUpdate: _rebuild);
   }
 
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  void _startMicTicker() {
+    _micTicker?.cancel();
+    _micTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (_mic.phase != ComposerMicPhase.recording) return;
+      setState(() {});
+    });
+  }
+
+  Future<void> _abandonMic() async {
+    _micTicker?.cancel();
+    _micWatch.stop();
+    _micWatch.reset();
+    await _mic.cancel();
+  }
+
+  Future<void> _startMic() async {
+    _focusNode.unfocus();
+    try {
+      await _mic.start();
+      _micWatch
+        ..reset()
+        ..start();
+      _startMicTicker();
+      if (mounted) setState(() {});
+    } on MicPermissionDeniedException catch (e) {
+      _showMessage(e.message);
+    } catch (e) {
+      _showMessage('Could not start recording. $e');
+    }
+  }
+
+  Future<void> _toggleMicPause() async {
+    if (_mic.phase == ComposerMicPhase.recording) {
+      _micWatch.stop();
+      _micTicker?.cancel();
+      try {
+        await _mic.pause();
+      } catch (e) {
+        _micWatch.start();
+        _startMicTicker();
+        _showMessage('Could not pause recording. $e');
+      }
+    } else if (_mic.phase == ComposerMicPhase.paused) {
+      try {
+        await _mic.resume();
+        _micWatch.start();
+        _startMicTicker();
+      } catch (e) {
+        _showMessage('Could not resume recording. $e');
+      }
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _cancelMic() async {
+    await _abandonMic();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _finishMic() async {
+    _micWatch.stop();
+    _micTicker?.cancel();
+    try {
+      final spoken = await _mic.finish();
+      if (!mounted || spoken == null) return;
+      if (spoken.trim().isEmpty) {
+        _showMessage('No speech detected.');
+        return;
+      }
+      _input.text = mergeDictationIntoPrompt(_input.text, spoken);
+      _input.selection = TextSelection.collapsed(offset: _input.text.length);
+      _focusNode.requestFocus();
+    } catch (e) {
+      _showMessage(describeTranscriptionError(e));
+    } finally {
+      _micWatch.reset();
+      if (mounted) setState(() {});
+    }
+  }
+
   Future<void> _reset() async {
+    await _abandonMic();
     try {
       await _chat.resetChat(onUpdate: _rebuild);
     } catch (e) {
@@ -93,6 +217,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _logoutRemote() async {
+    await _abandonMic();
     await _chat.logoutRemote();
     if (!mounted) return;
     Navigator.pushReplacement(
@@ -134,11 +259,13 @@ class _ChatScreenState extends State<ChatScreen> {
             icon: const Icon(Icons.settings),
             tooltip: 'Settings',
             onPressed: () async {
+              await _abandonMic();
+              if (!context.mounted) return;
               await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const SettingsScreen()),
               );
-              if (!mounted) return;
+              if (!context.mounted) return;
               _offlineSnackShown = false;
               await _chat.bootstrap(onUpdate: _rebuild);
             },
@@ -148,6 +275,8 @@ class _ChatScreenState extends State<ChatScreen> {
               icon: const Icon(Icons.storage),
               tooltip: 'Session Manager',
               onPressed: () async {
+                await _abandonMic();
+                if (!context.mounted) return;
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -225,6 +354,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       trailing: TextButton(
                         onPressed: () async {
+                          await _abandonMic();
+                          if (!context.mounted) return;
                           await Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -253,32 +384,17 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
                 if (_chat.sending) const LinearProgressIndicator(minHeight: 2),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _input,
-                          focusNode: _focusNode,
-                          textCapitalization: TextCapitalization.sentences,
-                          keyboardType: TextInputType.multiline,
-                          maxLines: null,
-                          enabled: !_chat.sending && !_chat.needsOfflineKey,
-                          decoration: const InputDecoration(
-                            hintText: 'Type a message...',
-                          ),
-                          onSubmitted: (_) => _send(),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.send),
-                        onPressed: (_chat.sending || _chat.needsOfflineKey)
-                            ? null
-                            : _send,
-                      ),
-                    ],
-                  ),
+                ChatComposer(
+                  controller: _input,
+                  focusNode: _focusNode,
+                  phase: _mic.phase,
+                  elapsed: _micWatch.elapsed,
+                  inputEnabled: !_chat.sending && !_chat.needsOfflineKey,
+                  onSend: (_chat.sending || _chat.needsOfflineKey) ? null : _send,
+                  onMic: (_chat.sending || _chat.needsOfflineKey) ? null : _startMic,
+                  onCancel: _cancelMic,
+                  onTogglePause: _toggleMicPause,
+                  onFinish: _finishMic,
                 ),
               ],
             ),

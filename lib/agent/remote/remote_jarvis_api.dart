@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../../config/app_config.dart';
 import '../../domain/models/chat_turn.dart';
@@ -122,6 +123,93 @@ class RemoteJarvisApi implements JarvisBackend, JarvisAdminBackend {
     );
   }
 
+  Future<http.Response> _sendMultipart({
+    required String base,
+    required String path,
+    required String fieldName,
+    required List<int> bytes,
+    required String filename,
+  }) async {
+    final token = await _auth.getToken();
+    if (token == null || token.isEmpty) {
+      throw JarvisRemoteException(
+        'Remote transcription requires a login.',
+        statusCode: 401,
+        kind: RemoteFailureKind.auth,
+      );
+    }
+    final request = http.MultipartRequest('POST', Uri.parse('$base$path'));
+    request.headers['Authorization'] = 'Bearer $token';
+    request.headers['Accept'] = 'application/json';
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        fieldName,
+        bytes,
+        filename: filename,
+        // Extension is required; octet-stream is an accepted part type.
+        contentType: MediaType('application', 'octet-stream'),
+      ),
+    );
+    final streamed = await _http.send(request);
+    return http.Response.fromStream(streamed);
+  }
+
+  Future<http.Response> _postMultipart(
+    String path, {
+    required String fieldName,
+    required List<int> bytes,
+    required String filename,
+    Duration? timeoutOverride,
+  }) async {
+    return _withBases(
+      (base, timeout) {
+        return _sendMultipart(
+          base: base,
+          path: path,
+          fieldName: fieldName,
+          bytes: bytes,
+          filename: filename,
+        ).timeout(timeout);
+      },
+      label: 'POST $path',
+      primaryTimeout: timeoutOverride,
+    );
+  }
+
+  /// `POST /transcribe`: multipart field `file`, Bearer JWT, body `{text}`.
+  ///
+  /// The server does not keep the audio. Local / offline dictation must not
+  /// call this method.
+  Future<String> transcribeAudio({
+    required List<int> bytes,
+    required String filename,
+  }) async {
+    final resp = await _postMultipart(
+      '/transcribe',
+      fieldName: 'file',
+      bytes: bytes,
+      filename: filename,
+      timeoutOverride: AppConfig.remoteTranscribeTimeout,
+    );
+    if (resp.statusCode != 200) {
+      final detail = readFastApiDetail(resp);
+      throw JarvisRemoteException(
+        detail ?? 'Transcription failed: ${resp.statusCode}',
+        statusCode: resp.statusCode,
+        kind: kindFromStatusCode(resp.statusCode),
+      );
+    }
+    final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
+    if (decoded is! Map || decoded['text'] is! String) {
+      throw JarvisRemoteException(
+        'Transcription response missing text',
+        statusCode: resp.statusCode,
+        kind: RemoteFailureKind.other,
+      );
+    }
+    return decoded['text'] as String;
+  }
+
   void _ensureOk(http.Response resp, String label) {
     if (resp.statusCode == 200) return;
     throw JarvisRemoteException(
@@ -193,4 +281,18 @@ class RemoteJarvisApi implements JarvisBackend, JarvisAdminBackend {
     final resp = await _post('/admin/reset-global-memory');
     _ensureOk(resp, 'Global reset');
   }
+}
+
+/// FastAPI `detail` when it is a string. Validation-error lists are ignored.
+String? readFastApiDetail(http.Response resp) {
+  try {
+    final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
+    if (decoded is Map) {
+      final detail = decoded['detail'];
+      if (detail is String && detail.trim().isNotEmpty) {
+        return detail.trim();
+      }
+    }
+  } catch (_) {}
+  return null;
 }

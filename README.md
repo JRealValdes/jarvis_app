@@ -22,6 +22,7 @@ Deeper layout and remote API contract: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.
 | [#4](https://github.com/JRealValdes/jarvis_app/issues/4) | Cursor skill to build APK — **done** |
 | [#12](https://github.com/JRealValdes/jarvis_app/issues/12) | Remove Firebase URL discovery; configured LAN base URL — **done** |
 | [#11](https://github.com/JRealValdes/jarvis_app/issues/11) | Tailscale / off-LAN remote access (after #12) — **done** |
+| [#21](https://github.com/JRealValdes/jarvis_app/issues/21) | Composer mic → prompt (pause / cancel / Whisper) — **done** |
 
 Mark a row **done** in this table when that issue ships (same PR / follow-up docs commit). Verification (unit tests + smoke) stays **inside** each issue — no separate test-only issue. Backend mirror: [jarvis#29](https://github.com/JRealValdes/jarvis/issues/29) (Pi/LAN), [#30](https://github.com/JRealValdes/jarvis/issues/30) (drop cloudflared/Firebase — first), [#31](https://github.com/JRealValdes/jarvis/issues/31) (Tailscale — after #30).
 
@@ -131,7 +132,7 @@ Do **not** port-forward `:8000`, embed a Tailscale SDK in the app, or bring back
 | LinkedIn draft / reply examples | No | Yes |
 | Job preferences YAML | No | Yes |
 | Google Calendar | No | Yes |
-| Speech-to-text | No | Yes |
+| Composer dictation | Yes — OpenAI `whisper-1` with the Settings key (does not call Jarvis) | Yes — `POST /transcribe` |
 
 Local system prompts follow Python butler + language + datetime/web-search guidance; server-only tools are called out so the on-device model does not invent side-effects.
 
@@ -142,6 +143,7 @@ Local system prompts follow Python butler + language + datetime/web-search guida
 - Settings: Auto / Local / Remote, key & profile, API base URL, remote login/logout
 - Remote chat + admin Session Manager (JWT `admin`, remote-only)
 - Remote client aligned with jarvis defaults (`GPT_4O_MINI`, boolean JWT `admin`)
+- Composer microphone: record, pause, resume, cancel; text lands in the prompt for editing before send
 
 ---
 

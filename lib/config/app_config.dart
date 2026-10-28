@@ -15,6 +15,12 @@ class AppConfig {
   /// After this wait on `/ask`, offer Keep waiting / Go offline (Auto).
   static const Duration remoteAskSoftWait = Duration(seconds: 12);
 
+  /// Hard ceiling for `POST /transcribe` (Whisper can outlast the transport probe).
+  static const Duration remoteTranscribeTimeout = Duration(seconds: 60);
+
+  /// OpenAI Whisper upload limit. Jarvis `POST /transcribe` enforces the same cap.
+  static const int maxAudioUploadBytes = 25 * 1024 * 1024;
+
   /// One-shot LAN mDNS/hostname fallback when the configured primary URL fails.
   ///
   /// Override at build time, e.g.:
@@ -38,6 +44,13 @@ class AppConfig {
   /// OpenAI Chat Completions endpoint.
   static const String openAiChatCompletionsUrl =
       'https://api.openai.com/v1/chat/completions';
+
+  /// On-device speech-to-text. Local and offline modes must not call `/transcribe`.
+  static const String openAiAudioTranscriptionsUrl =
+      'https://api.openai.com/v1/audio/transcriptions';
+
+  /// Whisper model shared with Jarvis `POST /transcribe`.
+  static const String whisperModel = 'whisper-1';
 
   /// Maps legacy / UI model labels to OpenAI model ids.
   static String resolveOpenAiModelId(String modelName) {
