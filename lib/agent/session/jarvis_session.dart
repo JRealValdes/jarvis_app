@@ -1,6 +1,8 @@
+import '../../domain/chat_image.dart';
 import '../../domain/chat_state.dart';
 import '../../domain/models/user_profile.dart';
 import '../../domain/prompts.dart';
+import '../attachments/vision_content.dart';
 import '../openai/openai_client.dart';
 import '../openai/openai_errors.dart';
 import '../tools/tool.dart';
@@ -35,7 +37,10 @@ class JarvisSession {
   /// Always true in local personal mode (profile replaces ID protocol).
   bool get validUser => true;
 
-  Future<List<String>> ask(String prompt) async {
+  Future<List<String>> ask(
+    String prompt, {
+    List<ChatImage> images = const [],
+  }) async {
     _updateChatState();
 
     if (_chatState == ChatState.notInitialized) {
@@ -47,8 +52,15 @@ class JarvisSession {
     }
 
     try {
+      if (images.isNotEmpty && !openAiModelSupportsImages(model)) {
+        throw OpenAiException(
+          'The selected model does not support images. '
+          'Choose gpt-4o-mini in Settings.',
+        );
+      }
+      final content = userMessageContent(prompt, images);
       if (_chatState == ChatState.startingChat) {
-        final messages = <Map<String, dynamic>>[
+        final messages = prepareMessagesForVision(<Map<String, dynamic>>[
           {
             'role': 'system',
             'content': buildBackgroundPrompt(
@@ -62,9 +74,9 @@ class JarvisSession {
           },
           {
             'role': 'user',
-            'content': prompt,
+            'content': content,
           },
-        ];
+        ]);
         final result = await openAi.completeWithTools(
           model: model,
           messages: messages,
@@ -77,8 +89,10 @@ class JarvisSession {
       }
 
       if (_chatState == ChatState.initialized) {
-        final messages = List<Map<String, dynamic>>.from(llmMessages)
-          ..add({'role': 'user', 'content': prompt});
+        final messages = prepareMessagesForVision(
+          List<Map<String, dynamic>>.from(llmMessages)
+            ..add({'role': 'user', 'content': content}),
+        );
         final result = await openAi.completeWithTools(
           model: model,
           messages: messages,

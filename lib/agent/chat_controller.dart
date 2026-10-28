@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import '../config/app_config.dart';
 import '../data/secure_store.dart';
+import '../domain/chat_image.dart';
 import '../domain/models/jarvis_mode.dart';
 import 'backend_factory.dart';
 import 'failover_jarvis_backend.dart';
@@ -10,12 +12,35 @@ import 'openai/openai_errors.dart';
 import 'remote/auth_service.dart';
 import 'remote/remote_failure.dart';
 
+/// Thumbnail or audio chip shown on a user bubble for the turn just sent.
+class ChatBubbleMedia {
+  const ChatBubbleMedia.image({
+    required this.bytes,
+    required this.label,
+  }) : isImage = true;
+
+  const ChatBubbleMedia.audio({required this.label})
+      : isImage = false,
+        bytes = null;
+
+  final bool isImage;
+  final Uint8List? bytes;
+  final String label;
+}
+
 /// One bubble shown in the chat list (UI-facing).
 class ChatBubble {
-  const ChatBubble({required this.text, required this.isUser});
+  const ChatBubble({
+    required this.text,
+    required this.isUser,
+    this.media = const [],
+  });
 
   final String text;
   final bool isUser;
+
+  /// Live attachments. History reloads have none; image turns use a text marker.
+  final List<ChatBubbleMedia> media;
 }
 
 /// Owns chat orchestration so [ChatScreen] stays mostly presentation.
@@ -66,6 +91,7 @@ class ChatController {
 
   int _askGeneration = 0;
   String? _pendingAskPayload;
+  List<ChatImage> _pendingImages = const [];
   Timer? _softWaitTimer;
   void Function()? _onUpdate;
 
@@ -142,7 +168,11 @@ class ChatController {
     notify?.call();
 
     try {
-      final responses = await failover.ask(payload, modelName: modelName);
+      final responses = await failover.ask(
+        payload,
+        modelName: modelName,
+        images: _pendingImages,
+      );
       for (final msg in responses) {
         messages.add(ChatBubble(text: msg, isUser: false));
       }
@@ -154,6 +184,7 @@ class ChatController {
     } finally {
       sending = false;
       _pendingAskPayload = null;
+      _pendingImages = const [];
       notify?.call();
     }
   }
@@ -211,9 +242,16 @@ class ChatController {
   }
 
   /// Sends [text], or the seed turn when [initial] is true (not shown as user).
+  ///
+  /// [visibleText] is the typed prompt. Audio transcripts stay in [text] only.
+  /// [images] may be sent with an empty [text]. Remote turns with images use
+  /// `GPT_4O_MINI` (the vision model). Local keeps the Settings model.
   Future<void> send({
     String? text,
+    String? visibleText,
     bool initial = false,
+    List<ChatImage> images = const [],
+    List<ChatBubbleMedia> media = const [],
     void Function()? onUpdate,
   }) async {
     final backend = _backend;
@@ -254,13 +292,17 @@ class ChatController {
       }
     } else {
       payload = (text ?? '').trim();
-      if (payload.isEmpty) return;
-      messages.add(ChatBubble(text: payload, isUser: true));
+      if (payload.isEmpty && images.isEmpty) return;
+      final shown = (visibleText ?? payload).trim();
+      messages.add(
+        ChatBubble(text: shown, isUser: true, media: List.of(media)),
+      );
     }
 
     sending = true;
     needsOfflineKey = false;
     _pendingAskPayload = payload;
+    _pendingImages = List<ChatImage>.of(images);
     _onUpdate = onUpdate;
     _clearSlowOffer();
     final gen = ++_askGeneration;
@@ -282,7 +324,11 @@ class ChatController {
       if (offlineActive && mode == JarvisMode.auto) {
         modelName = await _secureStore.getOpenAiModel();
       }
-      final responses = await backend.ask(payload, modelName: modelName);
+      final responses = await backend.ask(
+        payload,
+        modelName: _modelForAsk(images),
+        images: images,
+      );
       if (gen != _askGeneration) return;
       _syncOfflineFlag();
       if (offlineActive && mode == JarvisMode.auto) {
@@ -304,6 +350,8 @@ class ChatController {
             isUser: false,
           ),
         );
+      } else if (e is JarvisRemoteException && e.message.trim().isNotEmpty) {
+        messages.add(ChatBubble(text: e.message, isUser: false));
       } else {
         messages.add(ChatBubble(text: describeOpenAiError(e), isUser: false));
       }
@@ -312,9 +360,18 @@ class ChatController {
         _clearSlowOffer();
         sending = false;
         _pendingAskPayload = null;
+        _pendingImages = const [];
         onUpdate?.call();
       }
     }
+  }
+
+  /// Remote vision is `GPT_4O_MINI` only. On-device turns keep Settings.
+  String _modelForAsk(List<ChatImage> images) {
+    if (images.isEmpty) return modelName;
+    final onDevice = mode == JarvisMode.local || offlineActive;
+    if (!onDevice) return AppConfig.defaultRemoteModelEnum;
+    return modelName;
   }
 
   Future<void> resetChat({void Function()? onUpdate}) async {

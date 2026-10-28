@@ -6,14 +6,21 @@ import 'package:jarvis_app/agent/remote/remote_failure.dart';
 import 'package:jarvis_app/agent/remote/remote_jarvis_api.dart';
 import 'package:jarvis_app/data/local_credentials.dart';
 import 'package:jarvis_app/data/memory_message_store.dart';
+import 'package:jarvis_app/domain/chat_image.dart';
 import 'package:jarvis_app/domain/models/chat_turn.dart';
 
 class _FakeOffline implements JarvisBackend {
   final replies = <String>[];
+  List<ChatImage> lastImages = const [];
 
   @override
-  Future<List<String>> ask(String message, {required String modelName}) async {
+  Future<List<String>> ask(
+    String message, {
+    required String modelName,
+    List<ChatImage> images = const [],
+  }) async {
     replies.add(message);
+    lastImages = images;
     return ['offline:$message'];
   }
 
@@ -74,6 +81,29 @@ void main() {
       expect(offline.replies, ['hello']);
     });
 
+    test('transport failure forwards image attachments to offline', () async {
+      final offline = _FakeOffline();
+      const image = ChatImage(mediaType: 'image/png', dataBase64: 'abc');
+      final backend = FailoverJarvisBackend(
+        remote: _ThrowingRemote(
+          JarvisRemoteException(
+            'down',
+            kind: RemoteFailureKind.transport,
+          ),
+        ),
+        localCredentials: _CredsWithKey(hasKey: true),
+        offlineFactory: ({required bool skipWelcome}) => _AgentShim(offline),
+      );
+
+      await backend.ask(
+        'look',
+        modelName: 'GPT_4O_MINI',
+        images: const [image],
+      );
+      expect(offline.lastImages, [image]);
+      expect(offline.replies, ['look']);
+    });
+
     test('transport failure + no key → OfflineKeyRequiredException', () async {
       final backend = FailoverJarvisBackend(
         remote: _ThrowingRemote(
@@ -127,7 +157,11 @@ class _ThrowingRemote extends RemoteJarvisApi {
   final Object error;
 
   @override
-  Future<List<String>> ask(String message, {required String modelName}) async {
+  Future<List<String>> ask(
+    String message, {
+    required String modelName,
+    List<ChatImage> images = const [],
+  }) async {
     // ignore: only_throw_errors
     throw error;
   }
@@ -157,8 +191,12 @@ class _AgentShim extends LocalJarvisAgent {
   final JarvisBackend inner;
 
   @override
-  Future<List<String>> ask(String message, {required String modelName}) =>
-      inner.ask(message, modelName: modelName);
+  Future<List<String>> ask(
+    String message, {
+    required String modelName,
+    List<ChatImage> images = const [],
+  }) =>
+      inner.ask(message, modelName: modelName, images: images);
 
   @override
   Future<List<ChatTurn>> getMessageHistory({String? threadId}) =>
