@@ -51,12 +51,13 @@ Do not create the issue(s) or branch until they agree (unless they already order
 
 If the user asks to solve, implement, or continue issue `#N`:
 
-1. **Read the issue:** `gh issue view <N>` (add `--repo JRealValdes/jarvis` when the issue is on the backend). Treat the issue body/checklist as the source of requirements.
-2. **Use the development branch** (only when working in the repo that owns that issue):
+1. **Read the issue including comments:** `gh issue view <N> --comments` (add `--repo JRealValdes/jarvis` when the issue is on the backend). Treat title, body, checklist, **and comments** as requirements. Comments often hold handoffs, contract notes, or follow-ups missing from the body.
+2. **Read the sibling issue when cross-linked:** if the body or comments link a related issue in the other repo (e.g. “Related backend issue: …”), also run `gh issue view <sibling> --comments` with the matching `--repo`. When implementing frontend work, prefer absorbing handoffs left on the backend sibling (and vice versa).
+3. **Use the development branch** (only when working in the repo that owns that issue):
    - Look for an existing local or remote branch matching `feature/<N>-*` (or the branch linked under the issue’s Development section).
    - If it exists: check it out and pull latest (`git fetch` / `git pull`).
    - If it does not exist: create `feature/<N>-<slug>` from up-to-date `main` (slug from the issue title). Prefer `gh issue develop <N> --name feature/<N>-<slug> --checkout` when available; otherwise `git checkout -b` + `git push -u`.
-3. **Develop on that branch** only — do not implement `#N` on `main`. Update the issue body when new scope materially helps tracking.
+4. **Develop on that branch** only — do not implement `#N` on `main`. Honor comment/handoff notes alongside the body. Update the issue body when new scope materially helps tracking.
 
 ## 1. Create the issue(s)
 
@@ -153,7 +154,7 @@ When a PR for `feature/<N>-*` is **merged**:
 
 ```
 - [ ] New work classified: backend / frontend / both; issues created in the matching repo(s) and cross-linked when both
-- [ ] Issue exists (#N) in the owning repo, English; read before coding when working an existing issue
+- [ ] Issue exists (#N) in the owning repo, English; read with `--comments` before coding when working an existing issue; also read the cross-linked sibling issue (with comments) when present
 - [ ] On feature/<N>-* in that repo (checked out or created), not on main
 - [ ] Work landed on that branch
 - [ ] Issue body updated only when useful
