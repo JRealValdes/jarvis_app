@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
 import '../../config/app_config.dart';
+import '../../domain/chat_image.dart';
 import '../../domain/models/chat_turn.dart';
 import '../jarvis_backend.dart';
 import 'auth_service.dart';
@@ -219,17 +220,37 @@ class RemoteJarvisApi implements JarvisBackend, JarvisAdminBackend {
     );
   }
 
+  /// `POST /ask`. Images ride on the same JSON body (`media_type` + base64).
+  ///
+  /// Omit [images] for a text turn so the body stays `{message, model_name}`.
+  /// A blank [message] is valid when [images] is non-empty. Audio bytes never
+  /// go here — transcribe them first and put the text in [message].
   @override
-  Future<List<String>> ask(String message, {required String modelName}) async {
+  Future<List<String>> ask(
+    String message, {
+    required String modelName,
+    List<ChatImage> images = const [],
+  }) async {
+    final body = <String, dynamic>{
+      'message': message,
+      'model_name': modelName,
+    };
+    if (images.isNotEmpty) {
+      body['images'] = [for (final image in images) image.toAskJson()];
+    }
     final resp = await _post(
       '/ask',
-      body: {
-        'message': message,
-        'model_name': modelName,
-      },
+      body: body,
       timeoutOverride: _askTimeout,
     );
-    _ensureOk(resp, 'Ask');
+    if (resp.statusCode != 200) {
+      final detail = readFastApiDetail(resp);
+      throw JarvisRemoteException(
+        detail ?? 'Ask failed: ${resp.statusCode}',
+        statusCode: resp.statusCode,
+        kind: kindFromStatusCode(resp.statusCode),
+      );
+    }
     final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
     return List<String>.from(decoded['response'] ?? []);
   }

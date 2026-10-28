@@ -2,8 +2,10 @@ import '../config/app_config.dart';
 import '../data/local_message_store.dart';
 import '../data/message_store.dart';
 import '../data/secure_store.dart';
+import '../domain/chat_image.dart';
 import '../domain/chat_state.dart';
 import '../domain/models/chat_turn.dart';
+import 'attachments/outgoing_ask.dart';
 import 'jarvis_backend.dart';
 import 'openai/openai_client.dart';
 import 'session/jarvis_session.dart';
@@ -33,14 +35,26 @@ class LocalJarvisAgent implements JarvisBackend {
   String get _threadId => AppConfig.localThreadId;
 
   @override
-  Future<List<String>> ask(String message, {required String modelName}) async {
+  Future<List<String>> ask(
+    String message, {
+    required String modelName,
+    List<ChatImage> images = const [],
+  }) async {
     final session = await _ensureSession(modelName: modelName);
-    final replies = await session.ask(message);
+    final replies = await session.ask(message, images: images);
 
     final uiTurns = <ChatTurn>[];
     final isWelcomeTurn = session.chatState == ChatState.jarvisWelcomeMessage;
     if (!isWelcomeTurn) {
-      uiTurns.add(ChatTurn(role: 'user', content: message));
+      uiTurns.add(
+        ChatTurn(
+          role: 'user',
+          content: historyUserContent(
+            message: message,
+            imageCount: images.length,
+          ),
+        ),
+      );
     }
     for (final r in replies) {
       uiTurns.add(ChatTurn(role: 'assistant', content: r));

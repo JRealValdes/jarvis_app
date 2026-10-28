@@ -1,6 +1,7 @@
 import '../data/local_credentials.dart';
 import '../data/memory_message_store.dart';
 import '../data/secure_store.dart';
+import '../domain/chat_image.dart';
 import '../domain/chat_state.dart';
 import '../domain/models/chat_turn.dart';
 import 'jarvis_backend.dart';
@@ -82,14 +83,22 @@ class FailoverJarvisBackend implements JarvisBackend {
   }
 
   @override
-  Future<List<String>> ask(String message, {required String modelName}) {
+  Future<List<String>> ask(
+    String message, {
+    required String modelName,
+    List<ChatImage> images = const [],
+  }) {
     return _remoteOrOffline(
       remoteOp: () async {
-        final replies = await _remote.ask(message, modelName: modelName);
+        final replies = await _remote.ask(
+          message,
+          modelName: modelName,
+          images: images,
+        );
         _skipWelcomeOnCutover = true;
         return replies;
       },
-      offlineOp: (o) => o.ask(message, modelName: modelName),
+      offlineOp: (o) => o.ask(message, modelName: modelName, images: images),
     );
   }
 

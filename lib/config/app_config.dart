@@ -21,6 +21,26 @@ class AppConfig {
   /// OpenAI Whisper upload limit. Jarvis `POST /transcribe` enforces the same cap.
   static const int maxAudioUploadBytes = 25 * 1024 * 1024;
 
+  /// Per outgoing chat turn. Jarvis `POST /ask` rejects more than this.
+  static const int maxImagesPerMessage = 4;
+
+  /// App policy: one `POST /transcribe` per file, at most this many per turn.
+  static const int maxAudioFilesPerMessage = 2;
+
+  /// Decoded image cap enforced by Jarvis before the vision call.
+  static const int maxImageBytes = 4 * 1024 * 1024;
+
+  /// `GET /message-history` substitutes this for each image (no bytes).
+  static const String historyImageMarker = '[Image attached]';
+
+  /// Server text when a turn has images and a blank `message`.
+  static const String imageOnlyPrompt = 'Please look at the attached image(s).';
+
+  /// Replaces older image bytes on later model calls (latest photo is kept).
+  static const String omittedImageNote =
+      '[Image attached on an earlier message; omitted from this model call '
+      'to limit context.]';
+
   /// One-shot LAN mDNS/hostname fallback when the configured primary URL fails.
   ///
   /// Override at build time, e.g.:
