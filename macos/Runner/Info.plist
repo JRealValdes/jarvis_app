@@ -30,5 +30,9 @@
 	<string>NSApplication</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Jarvis uses the microphone to transcribe what you say into the chat prompt.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Jarvis uses the camera to attach photos to your message.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Jarvis uses your photo library to attach images to your message.</string>
 </dict>
 </plist>

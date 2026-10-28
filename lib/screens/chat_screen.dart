@@ -2,6 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../agent/attachments/device_attachment_picker.dart';
+import '../agent/attachments/image_payload.dart';
+import '../agent/attachments/outgoing_ask.dart';
+import '../agent/attachments/pending_attachment.dart';
 import '../agent/chat_controller.dart';
 import '../agent/remote/remote_jarvis_api.dart';
 import '../agent/speech/composer_mic_controller.dart';
@@ -12,8 +16,10 @@ import '../agent/speech/prompt_transcriber.dart';
 import '../agent/speech/record_mic_session.dart';
 import '../agent/speech/speech_route.dart';
 import '../agent/speech/transcription_errors.dart';
+import '../config/app_config.dart';
 import '../data/secure_store.dart';
 import '../domain/models/jarvis_mode.dart';
+import '../widgets/attachment_sheets.dart';
 import '../widgets/chat_composer.dart';
 import '../widgets/chat_message_bubble.dart';
 import 'login_screen.dart';
@@ -33,11 +39,15 @@ class _ChatScreenState extends State<ChatScreen> {
   final _focusNode = FocusNode();
   final _scrollController = ScrollController();
   final _store = SecureStore();
+  final _picker = DeviceAttachmentPicker();
+  final List<PendingAttachment> _attachments = [];
   late final ComposerMicController _mic;
   final _micWatch = Stopwatch();
   Timer? _micTicker;
   bool _wasAtBottom = true;
   bool _offlineSnackShown = false;
+  bool _preparingSend = false;
+  int _attachmentSeq = 0;
 
   void _rebuild() {
     if (mounted) setState(() {});
@@ -84,8 +94,12 @@ class _ChatScreenState extends State<ChatScreen> {
         _scrollToBottom();
       }
     });
+    _input.addListener(() {
+      if (mounted) setState(() {});
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _chat.bootstrap(onUpdate: _rebuild);
+      unawaited(_recoverLostCapture());
     });
   }
 
@@ -110,10 +124,207 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  bool get _composerIdle =>
+      _mic.phase == ComposerMicPhase.idle &&
+      !_chat.sending &&
+      !_preparingSend &&
+      !_chat.needsOfflineKey;
+
+  bool get _canSend =>
+      _composerIdle &&
+      (_input.text.trim().isNotEmpty || _attachments.isNotEmpty);
+
+  int get _imageCount => countAttachments(_attachments, AttachmentKind.image);
+
+  int get _audioCount => countAttachments(_attachments, AttachmentKind.audio);
+
+  Future<SpeechContext> _speechContext() async {
+    return SpeechContext(
+      mode: _chat.mode,
+      offlineActive: _chat.offlineActive,
+      openAiApiKey: await _store.getOpenAiApiKey(),
+    );
+  }
+
   Future<void> _send() async {
-    final text = _input.text;
-    _input.clear();
-    await _chat.send(text: text, onUpdate: _rebuild);
+    if (!_canSend) return;
+    final typed = _input.text;
+    final pending = List<PendingAttachment>.of(_attachments);
+    setState(() => _preparingSend = true);
+    try {
+      final context = await _speechContext();
+      final prepared = await prepareOutgoingAsk(
+        typed: typed,
+        attachments: pending,
+        transcribeAudio: (audio) => _mic.transcriber.transcribe(
+          bytes: audio.bytes,
+          filename: audio.filename,
+          context: context,
+        ),
+      );
+      if (!mounted) return;
+      _input.clear();
+      setState(() => _attachments.clear());
+      await _chat.send(
+        text: prepared.modelMessage,
+        visibleText: prepared.visibleText,
+        images: prepared.images,
+        media: [
+          for (final item in prepared.media)
+            if (item.isImage)
+              ChatBubbleMedia.image(bytes: item.bytes!, label: item.label)
+            else
+              ChatBubbleMedia.audio(label: item.label),
+        ],
+        onUpdate: _rebuild,
+      );
+    } catch (e) {
+      _showFailure(e);
+    } finally {
+      if (mounted) setState(() => _preparingSend = false);
+    }
+  }
+
+  Future<void> _openAttachSheet() async {
+    if (!_composerIdle) return;
+    final imagesAtLimit = _imageCount >= AppConfig.maxImagesPerMessage;
+    final audioAtLimit = _audioCount >= AppConfig.maxAudioFilesPerMessage;
+    if (imagesAtLimit && audioAtLimit) {
+      _showMessage(attachmentLimitMessage(_attachments)!);
+      return;
+    }
+    final kind = await showAttachKindSheet(
+      context,
+      imagesAtLimit: imagesAtLimit,
+      audioAtLimit: audioAtLimit,
+    );
+    if (!mounted || kind == null) return;
+    if (kind == AttachKind.audio) {
+      await _pickAudio();
+      return;
+    }
+    final source = await showImageSourceSheet(context);
+    if (!mounted || source == null) return;
+    if (source == ImagePickSource.gallery) {
+      await _pickGallery();
+    } else {
+      await _pickImageFiles();
+    }
+  }
+
+  Future<void> _pickGallery() async {
+    final remaining = AppConfig.maxImagesPerMessage - _imageCount;
+    if (remaining <= 0) {
+      _showMessage(
+        'At most ${AppConfig.maxImagesPerMessage} images are allowed per message.',
+      );
+      return;
+    }
+    try {
+      final picked = await _picker.pickGalleryImages(limit: remaining);
+      if (!mounted) return;
+      _addPicked(AttachmentKind.image, picked);
+    } catch (e) {
+      _showFailure(e);
+    }
+  }
+
+  Future<void> _pickImageFiles() async {
+    try {
+      final picked = await _picker.pickImageFiles();
+      if (!mounted) return;
+      _addPicked(AttachmentKind.image, picked);
+    } catch (e) {
+      _showFailure(e);
+    }
+  }
+
+  Future<void> _pickAudio() async {
+    try {
+      final picked = await _picker.pickAudioFiles();
+      if (!mounted) return;
+      _addPicked(AttachmentKind.audio, picked);
+    } catch (e) {
+      _showFailure(e);
+    }
+  }
+
+  Future<void> _openCamera() async {
+    if (!_composerIdle) return;
+    if (_imageCount >= AppConfig.maxImagesPerMessage) {
+      _showMessage(
+        'At most ${AppConfig.maxImagesPerMessage} images are allowed per message.',
+      );
+      return;
+    }
+    while (mounted) {
+      final PickedMedia? shot;
+      try {
+        shot = await _picker.capturePhoto();
+      } catch (e) {
+        _showFailure(e);
+        return;
+      }
+      if (shot == null || !mounted) return;
+      final action = await showCameraConfirmDialog(context, shot.bytes);
+      if (!mounted) return;
+      if (action == CameraConfirmAction.retake) continue;
+      if (action == CameraConfirmAction.use) {
+        _addPicked(AttachmentKind.image, [shot]);
+      }
+      return;
+    }
+  }
+
+  Future<void> _recoverLostCapture() async {
+    try {
+      final shot = await _picker.recoverLostCapture();
+      if (shot == null || !mounted) return;
+      if (_imageCount >= AppConfig.maxImagesPerMessage) return;
+      final action = await showCameraConfirmDialog(context, shot.bytes);
+      if (!mounted || action != CameraConfirmAction.use) return;
+      _addPicked(AttachmentKind.image, [shot]);
+    } catch (_) {}
+  }
+
+  void _addPicked(AttachmentKind kind, List<PickedMedia> picked) {
+    if (picked.isEmpty) return;
+    final intake = intakeAttachments(
+      existing: _attachments,
+      kind: kind,
+      picked: picked,
+      nextId: () => 'att-${_attachmentSeq++}',
+    );
+    setState(() => _attachments.addAll(intake.accepted));
+    if (intake.notices.isNotEmpty) {
+      _showMessage(intake.notices.join('\n'));
+    }
+  }
+
+  void _removeAttachment(String id) {
+    setState(() => _attachments.removeWhere((item) => item.id == id));
+  }
+
+  void _showFailure(Object error) {
+    final text = error.toString().toLowerCase();
+    if (error is ImageAttachmentException) {
+      _showMessage(error.message);
+      return;
+    }
+    if (text.contains('camera_access_denied') ||
+        text.contains('photo_access_denied') ||
+        text.contains('permission')) {
+      _showMessage(
+        'Permission is required to attach that file. '
+        'Enable it for Jarvis in system settings.',
+      );
+      return;
+    }
+    if (text.contains('no_available_camera') || text.contains('no cameras')) {
+      _showMessage('No camera is available on this device.');
+      return;
+    }
+    _showMessage(describeTranscriptionError(error));
   }
 
   void _showMessage(String message) {
@@ -206,6 +417,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _reset() async {
     await _abandonMic();
+    setState(() => _attachments.clear());
     try {
       await _chat.resetChat(onUpdate: _rebuild);
     } catch (e) {
@@ -379,19 +591,26 @@ class _ChatScreenState extends State<ChatScreen> {
                       return ChatMessageBubble(
                         text: m.text,
                         isUser: m.isUser,
+                        media: m.media,
                       );
                     },
                   ),
                 ),
-                if (_chat.sending) const LinearProgressIndicator(minHeight: 2),
+                if (_chat.sending || _preparingSend)
+                  const LinearProgressIndicator(minHeight: 2),
                 ChatComposer(
                   controller: _input,
                   focusNode: _focusNode,
                   phase: _mic.phase,
                   elapsed: _micWatch.elapsed,
-                  inputEnabled: !_chat.sending && !_chat.needsOfflineKey,
-                  onSend: (_chat.sending || _chat.needsOfflineKey) ? null : _send,
-                  onMic: (_chat.sending || _chat.needsOfflineKey) ? null : _startMic,
+                  inputEnabled: _composerIdle,
+                  attachments: _attachments,
+                  limitMessage: attachmentLimitMessage(_attachments),
+                  onSend: _canSend ? _send : null,
+                  onMic: _composerIdle ? _startMic : null,
+                  onAttach: _composerIdle ? _openAttachSheet : null,
+                  onCamera: _composerIdle ? _openCamera : null,
+                  onRemoveAttachment: _composerIdle ? _removeAttachment : null,
                   onCancel: _cancelMic,
                   onTogglePause: _toggleMicPause,
                   onFinish: _finishMic,
