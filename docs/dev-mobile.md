@@ -104,6 +104,20 @@ Aligned with Flutter 3.47’s pre-AGP-9 path:
 
 `android/gradle.properties` keeps `android.builtInKotlin=false` and `android.newDsl=false` until a full AGP 9 migration.
 
+## CI sideload APK (issue #24)
+
+Merges to `main` run **Release APK** (`.github/workflows/release-apk.yml`): Flutter stable on `ubuntu-latest`, fat release APK, GitHub Release asset. Download: [releases/latest](https://github.com/JRealValdes/jarvis_app/releases/latest).
+
+| Concern | Policy |
+|---------|--------|
+| Signing | Debug keystore (personal sideload) — not Play Store |
+| Secrets | No keystore / API keys in Actions |
+| versionName | From `pubspec.yaml`; bump `x.y.z` manually |
+| versionCode | `1000 + run_number` (injected at build time) |
+| Actions minutes | ~10–15 min/job; fine for typical personal merge cadence on free tier |
+
+Local on-demand builds (`tooling/build_apk.ps1` / `build-apk` skill) remain available; Releases are the download source of truth.
+
 ## Verified on this machine (issue #3)
 
 - `flutter doctor` → Android toolchain OK (SDK 36).
