@@ -35,9 +35,10 @@ Then follow [`.cursor/skills/github-feature-flow/SKILL.md`](../skills/github-fea
 
 Do **not** create a new issue. Proceed (no need to re-propose the full flow):
 
-1. Read the issue with `gh issue view X` (title, body, checklist). Add `--repo JRealValdes/jarvis` when the issue is on the backend.
-2. Check out the existing development branch for `#X`, or create it if missing (`feature/X-<slug>` from up-to-date `main`) — only when working in this repo.
-3. Develop there against the issue requirements; expand the issue body when useful.
+1. Read the issue with `gh issue view X --comments` (title, body, checklist, **and comments**). Add `--repo JRealValdes/jarvis` when the issue is on the backend. Comments often carry handoffs, API notes, or follow-ups that are not in the body.
+2. If the issue (or its comments) links a **related sibling** in the other repo, also read that issue with comments (`gh issue view <N> --comments --repo JRealValdes/jarvis` or the `jarvis_app` equivalent). Prefer backend handoffs when implementing the frontend pair.
+3. Check out the existing development branch for `#X`, or create it if missing (`feature/X-<slug>` from up-to-date `main`) — only when working in this repo.
+4. Develop there against the issue requirements plus comment/handoff notes; expand the issue body when useful.
 
 Details: same skill file, section “Work on an existing issue”.
 
