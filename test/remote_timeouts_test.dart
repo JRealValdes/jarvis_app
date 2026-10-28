@@ -6,6 +6,11 @@ void main() {
     expect(AppConfig.remoteTransportTimeout, const Duration(seconds: 8));
     expect(AppConfig.remoteAskSoftWait, const Duration(seconds: 12));
     expect(AppConfig.remoteAskTimeout, const Duration(seconds: 120));
+    expect(AppConfig.remoteTranscribeTimeout, const Duration(seconds: 60));
+    expect(
+      AppConfig.remoteTranscribeTimeout > AppConfig.remoteTransportTimeout,
+      isTrue,
+    );
     expect(
       AppConfig.remoteAskTimeout > AppConfig.remoteAskSoftWait,
       isTrue,

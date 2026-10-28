@@ -28,5 +28,7 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Jarvis uses the microphone to transcribe what you say into the chat prompt.</string>
 </dict>
 </plist>

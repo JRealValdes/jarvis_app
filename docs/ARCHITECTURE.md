@@ -80,6 +80,7 @@ Requires a reachable Jarvis FastAPI at the operator-configured base URL (home LA
 | POST | `/token` | HTTP Basic → `{ access_token, token_type }` |
 | GET | `/validate-token` | Bearer JWT |
 | POST | `/ask` | Body: `message`, `model_name` (`ModelEnum` name, default app: `GPT_4O_MINI`), optional `thread_id` |
+| POST | `/transcribe` | Bearer JWT. Multipart field `file` (extension required; `application/octet-stream` allowed). Response `{ text }`. Max 25 MiB. Audio is not stored. Timeout `remoteTranscribeTimeout` (60s). Mic → prompt only (#21); audio attachments are a separate flow |
 | GET | `/message-history` | Optional `thread_id`; `{ thread_id, messages: [{role,content}] }` |
 | POST | `/reset-session` | Optional `{ thread_id }` |
 | GET | `/individual-cache-status` | `{ exists }` for JWT `real_name` |
@@ -102,7 +103,8 @@ On-device web search scrapes DuckDuckGo HTML with `jarvisSearchUserAgent` (brows
 
 - Prompts: `domain/prompts.dart` tracks Python language + datetime/web-search rules; hostile path retained.
 - On-device tools: calc, datetime, `web_search_tool` (DuckDuckGo HTML + public fetch with Glassdoor/SSRF policy).
-- Server-only: calendar, speech, LinkedIn drafts/examples, job-preferences YAML.
+- Server-only agent tools: calendar, speech tool, LinkedIn drafts/examples, job-preferences YAML.
+- Composer dictation (#21) is not an agent tool. Remote and Auto-online call `POST /transcribe`. Local and Auto-offline call OpenAI `whisper-1` with the Settings key and do not call Jarvis.
 - ID-protocol helpers in `chat_state.dart` kept for parity; unused while `validUser` is always true locally.
 
 ## Mobile / release tooling
