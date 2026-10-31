@@ -51,7 +51,11 @@ class AppConfig {
     defaultValue: 'http://jarvis-raspberry.local:8000',
   );
 
-  /// Tight timeout for the optional LAN fallback attempt (avoid mDNS hangs).
+  /// Tight timeout for the optional LAN fallback on short probes (token,
+  /// validate-token, history, cache, reset). Avoids an mDNS hang.
+  ///
+  /// `POST /ask` and `POST /transcribe` do not use this on the fallback;
+  /// they reuse [remoteAskTimeout] and [remoteTranscribeTimeout].
   static const Duration lanFallbackTimeout = Duration(seconds: 2);
 
   /// OpenAI model id used when the user has not chosen one.

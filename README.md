@@ -52,7 +52,7 @@ On Windows, Flutter plugin builds may require **Developer Mode** (symlink suppor
 4. **Local only:** Setup with OpenAI key + profile; no home server required.
 5. **Remote only:** reachable Jarvis API (`uv run jarvis api` on the Pi) and the same configured base URL (e.g. `http://192.168.x.x:8000` on LAN, or a Tailscale `100.x` / MagicDNS URL off-LAN).
 
-Optional LAN fallback when the primary URL fails (short timeout): default `http://jarvis-raspberry.local:8000`, override with `--dart-define=JARVIS_LAN_FALLBACK_URL=...` (empty disables). Not a secret.
+Optional LAN fallback when the primary URL fails (2s on short probes; `/ask` and `/transcribe` keep their full timeout): default `http://jarvis-raspberry.local:8000`, override with `--dart-define=JARVIS_LAN_FALLBACK_URL=...` (empty disables). Not a secret.
 
 ```bash
 flutter run
