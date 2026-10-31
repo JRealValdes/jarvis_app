@@ -12,16 +12,18 @@ description: >-
 
 ## Policy (v1)
 
-- **Personal sideload only** — release build uses the **debug keystore** (see `android/app/build.gradle.kts`). Not Play Store signing.
+- **Personal sideload only** — release build uses the **stable sideload keystore** via `android/key.properties` (same cert as CI `ANDROID_SIDELOAD_*` secrets). Not Play Store signing.
 - **Preferred download:** GitHub Releases from CI (`.github/workflows/release-apk.yml` on `main`). This skill is for **on-demand local** builds.
 - APKs under `.app_release/` may still be tracked for local convenience. Do not commit keystores or API keys.
 - **Never** bake an OpenAI API key into the binary. Local/offline keys are entered by the user at runtime (secure storage).
+- Local `versionCode` must not undercut an installed CI APK (`1000 + run_number`). See [docs/dev-mobile.md](../../../docs/dev-mobile.md).
 
 ## Preconditions
 
 1. Flutter stable on PATH; Android toolchain healthy (`flutter doctor` — see [docs/dev-mobile.md](../../../docs/dev-mobile.md)).
-2. Working tree on the intended branch; prefer a clean tree or commit unrelated WIP first.
-3. `pubspec.yaml` `version:` is the source of truth for the artifact name (`1.4.0` → `jarvis_1.4.0.apk`). Do **not** auto-bump unless the user asks.
+2. `android/key.properties` present (copy from `android/key.properties.example`) pointing at the shared `android/sideload.keystore` (gitignored).
+3. Working tree on the intended branch; prefer a clean tree or commit unrelated WIP first.
+4. `pubspec.yaml` `version:` is the source of truth for the artifact name (`1.4.0` → `jarvis_1.4.0.apk`). Do **not** auto-bump unless the user asks.
 
 ## Preferred command (Windows)
 
@@ -33,10 +35,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tooling/build_apk.ps1 -Remov
 
 The script:
 
-1. Reads `version:` from `pubspec.yaml` (name part before `+`).
-2. Runs `flutter build apk --release`.
-3. Copies `build/app/outputs/flutter-apk/app-release.apk` → `.app_release/jarvis_<version>.apk`.
-4. Prints path, version, and size.
+1. Requires `android/key.properties` (fails fast if missing).
+2. Reads `version:` from `pubspec.yaml` (name part before `+`).
+3. Runs `flutter build apk --release`.
+4. Copies `build/app/outputs/flutter-apk/app-release.apk` → `.app_release/jarvis_<version>.apk`.
+5. Prints path, version, and size.
 
 Flags:
 
@@ -63,7 +66,7 @@ Optional cleanup: remove older `jarvis_*.apk` files in `.app_release/` so only t
 Copy and track:
 
 ```
-- [ ] Preconditions OK (Flutter + Android SDK)
+- [ ] Preconditions OK (Flutter + Android SDK + android/key.properties)
 - [ ] Ran tooling/build_apk.ps1 (or manual steps)
 - [ ] Artifact at .app_release/jarvis_<version>.apk
 - [ ] README Download link matches filename
@@ -78,8 +81,9 @@ After a successful build, tell the user:
 - Version (from pubspec)
 - Absolute or repo-relative path of the APK
 - File size
-- Signing: debug keystore / personal sideload
+- Signing: stable sideload keystore (`android/key.properties`)
 - Remind: install from unknown sources may be required; never redistribute an APK that embeds someone else’s API key
+- If migrating from an old debug-keystore install: one uninstall may be required
 
 ## Out of scope
 

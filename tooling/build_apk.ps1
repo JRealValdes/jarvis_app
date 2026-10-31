@@ -33,9 +33,20 @@ $destName = "jarvis_$versionName.apk"
 $destPath = Join-Path $outDir $destName
 $builtApk = Join-Path $repoRoot 'build\app\outputs\flutter-apk\app-release.apk'
 
+$keyProps = Join-Path $repoRoot 'android\key.properties'
+$keystoreHint = Join-Path $repoRoot 'android\sideload.keystore'
+
 Write-Host "Repo:    $repoRoot"
 Write-Host "Version: $versionName (pubspec: $rawVersion)"
 Write-Host "Output:  $destPath"
+
+if (-not (Test-Path $keyProps)) {
+  throw @"
+Missing android\key.properties — required for a stable sideload signature.
+Copy android\key.properties.example → android\key.properties and point storeFile at the shared sideload keystore (same cert as CI ANDROID_SIDELOAD_* secrets).
+See docs\dev-mobile.md. Expected keystore path (gitignored): $keystoreHint
+"@
+}
 
 if (-not $SkipFlutterBuild) {
   Write-Host 'Running flutter build apk --release ...'
@@ -96,4 +107,4 @@ Write-Host 'Done.'
 Write-Host "APK_PATH=$destPath"
 Write-Host "APK_VERSION=$versionName"
 Write-Host "APK_BYTES=$($item.Length)"
-Write-Host 'SIGNING=debug-keystore (personal sideload)'
+Write-Host 'SIGNING=sideload-keystore (android/key.properties)'

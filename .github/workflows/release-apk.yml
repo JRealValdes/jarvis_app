@@ -1,6 +1,7 @@
 # Build a personal-sideload release APK on every push to main and attach it
-# to a GitHub Release. Signing uses the debug keystore (see android/app/build.gradle.kts)
-# — not Play Store upload signing. Do not store keystores or API keys in this workflow.
+# to a GitHub Release. Signing uses the stable sideload keystore from
+# ANDROID_SIDELOAD_* secrets (same cert as local android/key.properties).
+# Not Play Store upload signing. Never commit the keystore or passwords.
 name: Release APK
 
 on:
@@ -61,6 +62,38 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "Build name=${name} code=${code} tag=${tag} apk=${apk}"
 
+      - name: Decode sideload keystore
+        env:
+          ANDROID_SIDELOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_SIDELOAD_KEYSTORE_BASE64 }}
+          ANDROID_SIDELOAD_STORE_PASSWORD: ${{ secrets.ANDROID_SIDELOAD_STORE_PASSWORD }}
+          ANDROID_SIDELOAD_KEY_ALIAS: ${{ secrets.ANDROID_SIDELOAD_KEY_ALIAS }}
+          ANDROID_SIDELOAD_KEY_PASSWORD: ${{ secrets.ANDROID_SIDELOAD_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in \
+            ANDROID_SIDELOAD_KEYSTORE_BASE64 \
+            ANDROID_SIDELOAD_STORE_PASSWORD \
+            ANDROID_SIDELOAD_KEY_ALIAS \
+            ANDROID_SIDELOAD_KEY_PASSWORD
+          do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing required secret: $name" >&2
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Configure ANDROID_SIDELOAD_* secrets (see docs/dev-mobile.md)." >&2
+            exit 1
+          fi
+          echo "$ANDROID_SIDELOAD_KEYSTORE_BASE64" | base64 -d > android/sideload.keystore
+          printf '%s\n' \
+            "storePassword=${ANDROID_SIDELOAD_STORE_PASSWORD}" \
+            "keyPassword=${ANDROID_SIDELOAD_KEY_PASSWORD}" \
+            "keyAlias=${ANDROID_SIDELOAD_KEY_ALIAS}" \
+            "storeFile=../sideload.keystore" \
+            > android/key.properties
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -94,6 +127,8 @@ jobs:
             | versionCode | `${{ steps.version.outputs.code }}` |
             | commit | `${{ github.sha }}` |
 
-            **Signing:** debug keystore (same as local `tooling/build_apk.ps1`). Not Play Store release signing. Allow install from unknown sources on the device.
+            **Signing:** stable personal sideload keystore (same cert as local `android/key.properties` / `tooling/build_apk.ps1`). Not Play Store release signing. Allow install from unknown sources on the device.
+
+            **Migration:** if you previously installed a debug-keystore build, uninstall once before installing this release; afterwards in-place updates preserve app data.
 
             Do not redistribute a build that embeds someone else's API key — keys are entered at runtime.

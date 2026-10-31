@@ -104,19 +104,59 @@ Aligned with Flutter 3.47’s pre-AGP-9 path:
 
 `android/gradle.properties` keeps `android.builtInKotlin=false` and `android.newDsl=false` until a full AGP 9 migration.
 
-## CI sideload APK (issue #24)
+## CI sideload APK (issues #24 / #40)
 
 Merges to `main` run **Release APK** (`.github/workflows/release-apk.yml`): Flutter stable on `ubuntu-latest`, fat release APK, GitHub Release asset. Download: [releases/latest](https://github.com/JRealValdes/jarvis_app/releases/latest).
 
 | Concern | Policy |
 |---------|--------|
-| Signing | Debug keystore (personal sideload) — not Play Store |
-| Secrets | No keystore / API keys in Actions |
+| Signing | Stable personal sideload keystore (same cert for CI + local) — not Play Store |
+| Secrets | `ANDROID_SIDELOAD_KEYSTORE_BASE64`, `ANDROID_SIDELOAD_STORE_PASSWORD`, `ANDROID_SIDELOAD_KEY_ALIAS`, `ANDROID_SIDELOAD_KEY_PASSWORD` |
 | versionName | From `pubspec.yaml`; bump `x.y.z` manually |
 | versionCode | `1000 + run_number` (injected at build time) |
 | Actions minutes | ~10–15 min/job; fine for typical personal merge cadence on free tier |
 
 Local on-demand builds (`tooling/build_apk.ps1` / `build-apk` skill) remain available; Releases are the download source of truth.
+
+### Stable sideload keystore (issue #40)
+
+Android refuses in-place updates when the signing certificate changes. CI used to mint a fresh debug cert on every runner, so GitHub Release APKs could not update over each other (or over local builds) without uninstall — wiping `flutter_secure_storage`.
+
+**Local setup (once per machine):**
+
+1. Obtain the shared sideload keystore (same file CI uses). Keep it **outside git** — typically `android/sideload.keystore` (already gitignored via `**/*.keystore`).
+2. Copy `android/key.properties.example` → `android/key.properties` and fill in store/key passwords, alias (`jarvis_sideload`), and `storeFile=../sideload.keystore`.
+3. Never commit `key.properties`, `*.keystore`, or `*.jks`.
+
+**Generate a new keystore** (only when rotating / first bootstrap — then upload the same material to Actions secrets):
+
+```powershell
+keytool -genkeypair -v `
+  -keystore android/sideload.keystore `
+  -alias jarvis_sideload `
+  -keyalg RSA -keysize 2048 -validity 10000 `
+  -storetype JKS
+# Then write android/key.properties from the passwords you chose (see key.properties.example).
+```
+
+Base64 for the Actions secret:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes('android\sideload.keystore')) | Set-Clipboard
+```
+
+**CI secrets** (repo Settings → Secrets and variables → Actions):
+
+| Secret | Value |
+|--------|--------|
+| `ANDROID_SIDELOAD_KEYSTORE_BASE64` | Base64 of `sideload.keystore` |
+| `ANDROID_SIDELOAD_STORE_PASSWORD` | Keystore password |
+| `ANDROID_SIDELOAD_KEY_ALIAS` | `jarvis_sideload` |
+| `ANDROID_SIDELOAD_KEY_PASSWORD` | Key password |
+
+**Migration:** one uninstall may be required when switching from ephemeral debug signing to this keystore; afterwards updates should preserve login / base URL / OpenAI key.
+
+**versionCode:** keep using monotonic CI codes (`1000 + run_number`). Local release builds used for sideload over an installed CI APK must pass a higher `--build-number` (or they are treated as downgrades).
 
 ## Verified on this machine (issue #3)
 

@@ -110,4 +110,4 @@ On-device web search scrapes DuckDuckGo HTML with `jarvisSearchUserAgent` (brows
 ## Mobile / release tooling
 
 - **#3:** Local emulator recipe — [docs/dev-mobile.md](dev-mobile.md).
-- **#4:** Agent APK skill — `.cursor/skills/build-apk/` + `tooling/build_apk.ps1` → `.app_release/jarvis_<version>.apk` (debug-keystore sideload).
+- **#4 / #40:** Agent APK skill — `.cursor/skills/build-apk/` + `tooling/build_apk.ps1` → `.app_release/jarvis_<version>.apk` (stable sideload keystore via `android/key.properties`; CI uses `ANDROID_SIDELOAD_*` secrets).

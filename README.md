@@ -32,7 +32,7 @@ Mark a row **done** in this table when that issue ships (same PR / follow-up doc
 
 👉 [Download APK](https://github.com/JRealValdes/jarvis_app/releases/latest) — latest GitHub Release (source of truth after merge to `main`).
 
-You may need to allow installation from unknown sources. Builds are **personal sideload** (debug keystore), not Play Store signing.
+You may need to allow installation from unknown sources. Builds are **personal sideload** (stable sideload keystore shared by CI and local), not Play Store signing. If you previously installed a debug-keystore build, uninstall once before the first stable-keystore APK; afterwards updates keep app data.
 
 ---
 
@@ -75,7 +75,7 @@ On every push to `main`, [`.github/workflows/release-apk.yml`](.github/workflows
 
 - **versionName** (`x.y.z`): from `pubspec.yaml` (bump manually when you want a new marketing version; CI does **not** auto-bump the patch).
 - **versionCode**: `1000 + github.run_number` so Android can update over older sideloads.
-- **Signing:** debug keystore — same spirit as local builds; not Play Store upload signing. No keystores or API keys in the repo/CI secrets for this MVP.
+- **Signing:** stable personal sideload keystore via `ANDROID_SIDELOAD_*` Actions secrets (same cert as local `android/key.properties`). Not Play Store upload signing. Never commit the keystore or passwords.
 - **Minutes:** a single Flutter release job is typically ~10–15 min on GitHub-hosted runners. At personal merge frequency that fits free-tier Actions quotas (public repos: unlimited; private: monthly minute budget). Re-run via **Actions → Release APK → Run workflow** if needed.
 
 ### How agents build the APK (local)
@@ -86,8 +86,8 @@ Project skill: `.cursor/skills/build-apk/` (triggers: “genera un nuevo apk”,
 powershell -NoProfile -ExecutionPolicy Bypass -File tooling/build_apk.ps1 -RemoveOldApks
 ```
 
-- Uses `flutter build apk --release` with the **debug keystore** (personal sideload).
-- Artifact: `.app_release/jarvis_<pubspec-version>.apk` (local convenience; prefer [Releases](https://github.com/JRealValdes/jarvis_app/releases/latest) for sharing).
+- Requires `android/key.properties` + the shared sideload keystore (see [docs/dev-mobile.md](docs/dev-mobile.md)); uses `flutter build apk --release`.
+- Artifact: `.app_release/jarvis_<pubspec-version>.apk` (local convenience; prefer [Releases](https://github.com/JRealValdes/jarvis_app/releases/latest) for sharing). Local `versionCode` must not undercut an installed CI build (`1000 + run_number`).
 - Never bake OpenAI keys into the binary; users paste keys at runtime.
 
 ### Smoke-test: Auto / offline failover

@@ -1,0 +1,7 @@
+# Copy to android/key.properties (gitignored) and fill in real values.
+# Must match the same keystore used by GitHub Actions (ANDROID_SIDELOAD_* secrets).
+# storeFile is relative to android/app/.
+storePassword=REPLACE_ME
+keyPassword=REPLACE_ME
+keyAlias=jarvis_sideload
+storeFile=../sideload.keystore
