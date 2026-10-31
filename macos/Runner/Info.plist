@@ -34,5 +34,7 @@
 	<string>Jarvis uses the camera to attach photos to your message.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Jarvis uses your photo library to attach images to your message.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Jarvis saves chat images you download to your photo library.</string>
 </dict>
 </plist>

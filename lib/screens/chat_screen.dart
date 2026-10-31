@@ -48,6 +48,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _offlineSnackShown = false;
   bool _preparingSend = false;
   int _attachmentSeq = 0;
+  String? _apiBaseUrl;
 
   void _rebuild() {
     if (mounted) setState(() {});
@@ -99,8 +100,15 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _chat.bootstrap(onUpdate: _rebuild);
+      unawaited(_loadApiBaseUrl());
       unawaited(_recoverLostCapture());
     });
+  }
+
+  Future<void> _loadApiBaseUrl() async {
+    final base = await _store.getApiBaseUrl();
+    if (!mounted) return;
+    setState(() => _apiBaseUrl = base);
   }
 
   @override
@@ -479,6 +487,7 @@ class _ChatScreenState extends State<ChatScreen> {
               );
               if (!context.mounted) return;
               _offlineSnackShown = false;
+              await _loadApiBaseUrl();
               await _chat.bootstrap(onUpdate: _rebuild);
             },
           ),
@@ -592,6 +601,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         text: m.text,
                         isUser: m.isUser,
                         media: m.media,
+                        apiBaseUrl: _apiBaseUrl,
                       );
                     },
                   ),

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:jarvis_app/agent/chat_controller.dart';
+import 'package:jarvis_app/agent/images/assistant_image_saver.dart';
+import 'package:jarvis_app/agent/images/assistant_image_url.dart';
+import 'package:jarvis_app/widgets/assistant_markdown_image.dart';
 import 'package:jarvis_app/widgets/assistant_markdown_styles.dart';
 
 /// Chat bubble matching the existing app look.
@@ -9,12 +12,24 @@ class ChatMessageBubble extends StatelessWidget {
     required this.text,
     required this.isUser,
     this.media = const [],
+    this.apiBaseUrl,
+    this.saveImage,
+    this.imageProviderForUrl,
     super.key,
   });
 
   final String text;
   final bool isUser;
   final List<ChatBubbleMedia> media;
+
+  /// Jarvis API origin used to resolve root-relative `/images/{id}` URLs.
+  final String? apiBaseUrl;
+
+  /// Override gallery save (tests). Defaults to [AssistantImageSaver.save].
+  final Future<String?> Function(String url)? saveImage;
+
+  /// Override network images in tests (e.g. [MemoryImage]).
+  final ImageProvider Function(String url)? imageProviderForUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -37,8 +52,28 @@ class ChatMessageBubble extends StatelessWidget {
                 data: text,
                 selectable: false,
                 styleSheet: assistantMarkdownStyleSheet(context),
+                sizedImageBuilder: _buildAssistantImage,
               ),
       ),
+    );
+  }
+
+  Widget _buildAssistantImage(MarkdownImageConfig config) {
+    final resolved = resolveAssistantImageUrl(
+      config.uri.toString(),
+      apiBaseUrl: apiBaseUrl,
+    );
+    if (resolved == null) {
+      return const Icon(Icons.broken_image_outlined, size: 48);
+    }
+    final saver = saveImage ?? AssistantImageSaver().save;
+    return AssistantMarkdownImage(
+      imageUrl: resolved,
+      alt: config.alt,
+      width: config.width,
+      height: config.height,
+      onSave: saver,
+      imageProvider: imageProviderForUrl?.call(resolved),
     );
   }
 }

@@ -1,0 +1,35 @@
+---
+description: Before committing, separate real Flutter plugin changes from generated noise (CRLF phantoms, platforms that do not register the plugin).
+alwaysApply: true
+---
+
+# Flutter commit hygiene (jarvis_app)
+
+Before staging after `flutter pub get` / adding a plugin, **triage** desktop/mobile generated paths. Do not dump every `M` from `git status` into the commit.
+
+## Usually commit (this repo tracks them)
+
+When the diff **registers the new plugin** (real `+/-` lines, not empty):
+
+- `pubspec.yaml`, `pubspec.lock`
+- `macos/Flutter/GeneratedPluginRegistrant.swift`
+- `windows/flutter/generated_plugin_registrant.cc`, `windows/flutter/generated_plugins.cmake`
+- Platform permission / Info.plist / AndroidManifest edits you made on purpose
+
+Same pattern as past plugin features (mic, attach, etc.).
+
+## Often noise — inspect, then discard
+
+- **`linux/flutter/generated_*`**: many plugins (e.g. `gal`) never appear here. Status may show `M` with **empty** `git diff` / same `git hash-object` as the index → CRLF or timestamp phantom. `git restore` those paths; do not commit.
+- Empty or whitespace-only diffs on any `generated_plugin*` / `GeneratedPluginRegistrant*` → restore, do not stage.
+- Auto-touched files unrelated to the feature with no meaningful content change → discard.
+
+## Quick checks
+
+```text
+git diff --stat -- <path>          # empty but status M? → likely phantom
+git hash-object <path>             # compare to: git ls-files -s <path>
+Select-String / rg for the plugin name in linux vs windows/macos registrants
+```
+
+If linux (or another platform) has **no** plugin name and no real diff → leave it out of the commit.
