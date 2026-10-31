@@ -26,7 +26,7 @@ ChatScreen
 
 `RemoteEndpoint` resolves the FastAPI base URL from Settings / Login (persisted). Auth (`/token`) and chat/admin calls share it; Basic vs Bearer headers stay in their callers.
 
-Optional NTH: if the primary URL fails with a transport error, one short-timeout retry against `AppConfig.lanFallbackBaseUrl` (`JARVIS_LAN_FALLBACK_URL`, default `http://jarvis-raspberry.local:8000`).
+Optional NTH: if the primary URL fails with a transport error, one retry against `AppConfig.lanFallbackBaseUrl` (`JARVIS_LAN_FALLBACK_URL`, default `http://jarvis-raspberry.local:8000`). Short probes use `lanFallbackTimeout` (2s). `POST /ask` and `POST /transcribe` reuse their primary timeout on that retry.
 
 Credentials are split by concern (same Keystore backend):
 
@@ -89,7 +89,7 @@ Requires a reachable Jarvis FastAPI at the operator-configured base URL (home LA
 
 JWT claims used by the app: `admin` (bool or legacy `1`), `real_name` (server-side thread default).
 
-Timeouts: transport probe `remoteTransportTimeout` (8s); `/ask` `remoteAskTimeout` (120s) with soft-wait offer at `remoteAskSoftWait` (12s); LAN fallback `lanFallbackTimeout` (2s). Android cleartext HTTP is allowed for LAN and Tailscale `http://` bases.
+Timeouts: transport probe `remoteTransportTimeout` (8s); `/ask` `remoteAskTimeout` (120s) with soft-wait offer at `remoteAskSoftWait` (12s); `/transcribe` `remoteTranscribeTimeout` (60s). LAN fallback `lanFallbackTimeout` (2s) applies to token, validate-token, history, cache, and reset. Fallback of `/ask` and `/transcribe` uses the same ceiling as the primary attempt. Android cleartext HTTP is allowed for LAN and Tailscale `http://` bases.
 
 On-device web search scrapes DuckDuckGo HTML with `jarvisSearchUserAgent` (browser-like); page fetch keeps `jarvisWebUserAgent` (JarvisBot) for robots/policy. Backend search uses the `ddgs` package instead of HTML scraping.
 

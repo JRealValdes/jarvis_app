@@ -94,9 +94,13 @@ class RemoteJarvisApi implements JarvisBackend, JarvisAdminBackend {
     }
 
     final primary = primaryTimeout ?? _timeout;
+    // An explicit per-call budget (`/ask`, `/transcribe`) also covers the LAN
+    // fallback. Probes that keep the default transport timeout still give up
+    // on the fallback after [AppConfig.lanFallbackTimeout].
+    final fallback = primaryTimeout ?? AppConfig.lanFallbackTimeout;
     Object? lastError;
     for (var i = 0; i < bases.length; i++) {
-      final timeout = i == 0 ? primary : AppConfig.lanFallbackTimeout;
+      final timeout = i == 0 ? primary : fallback;
       try {
         return await send(bases[i], timeout);
       } on TimeoutException catch (e) {
