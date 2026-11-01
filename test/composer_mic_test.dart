@@ -237,7 +237,8 @@ void main() {
     expect(find.byType(TextField), findsOneWidget);
     expect(find.byIcon(Icons.mic), findsOneWidget);
     expect(find.byIcon(Icons.send), findsOneWidget);
-    expect(find.text('Cancel'), findsNothing);
+    expect(find.byIcon(Icons.close), findsNothing);
+    expect(find.byIcon(Icons.check), findsNothing);
   });
 
   testWidgets('recording replaces the field with cancel, pause, and finish',
@@ -269,13 +270,13 @@ void main() {
     );
 
     expect(find.byType(TextField), findsNothing);
-    expect(find.text('Cancel'), findsOneWidget);
-    expect(find.text('Pause'), findsOneWidget);
-    expect(find.text('Finish'), findsOneWidget);
+    expect(find.byIcon(Icons.close), findsOneWidget);
+    expect(find.byIcon(Icons.pause), findsOneWidget);
+    expect(find.byIcon(Icons.check), findsOneWidget);
     expect(find.text('Recording 01:05'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('Finish'));
+    await tester.tap(find.byIcon(Icons.check));
     expect(finished, isTrue);
   });
 
@@ -302,8 +303,8 @@ void main() {
         ),
       ),
     );
-    expect(find.text('Resume'), findsOneWidget);
-    expect(find.text('Pause'), findsNothing);
+    expect(find.byIcon(Icons.play_arrow), findsOneWidget);
+    expect(find.byIcon(Icons.pause), findsNothing);
     expect(find.text('Paused 00:05'), findsOneWidget);
 
     await tester.pumpWidget(
@@ -324,7 +325,7 @@ void main() {
     );
     expect(find.text('Transcribing…'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    expect(find.text('Finish'), findsNothing);
+    expect(find.byIcon(Icons.check), findsNothing);
     expect(find.byType(TextField), findsNothing);
   });
 

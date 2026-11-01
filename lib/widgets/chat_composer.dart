@@ -253,17 +253,15 @@ class _RecordingBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final clock = formatRecordingClock(elapsed);
     final label = paused ? 'Paused $clock' : 'Recording $clock';
-    final buttonStyle = TextButton.styleFrom(
-      visualDensity: VisualDensity.compact,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-    );
+    const buttonConstraints = BoxConstraints(minWidth: 40, minHeight: 40);
     return Row(
       children: [
-        TextButton(
-          style: buttonStyle,
+        IconButton(
+          tooltip: 'Cancel',
+          visualDensity: VisualDensity.compact,
+          constraints: buttonConstraints,
           onPressed: onCancel,
-          child: const Text('Cancel'),
+          icon: const Icon(Icons.close),
         ),
         Expanded(
           child: Text(
@@ -271,15 +269,19 @@ class _RecordingBar extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        TextButton(
-          style: buttonStyle,
+        IconButton(
+          tooltip: paused ? 'Resume' : 'Pause',
+          visualDensity: VisualDensity.compact,
+          constraints: buttonConstraints,
           onPressed: onTogglePause,
-          child: Text(paused ? 'Resume' : 'Pause'),
+          icon: Icon(paused ? Icons.play_arrow : Icons.pause),
         ),
-        TextButton(
-          style: buttonStyle,
+        IconButton(
+          tooltip: 'Finish',
+          visualDensity: VisualDensity.compact,
+          constraints: buttonConstraints,
           onPressed: onFinish,
-          child: const Text('Finish'),
+          icon: const Icon(Icons.check),
         ),
       ],
     );
