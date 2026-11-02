@@ -80,7 +80,7 @@ Requires a reachable Jarvis FastAPI at the operator-configured base URL (home LA
 | POST | `/token` | HTTP Basic → `{ access_token, token_type }` |
 | GET | `/validate-token` | Bearer JWT |
 | POST | `/ask` | Body: `message`, `model_name` (`ModelEnum` name, default app: `GPT_4O_MINI`), optional `thread_id` |
-| POST | `/transcribe` | Bearer JWT. Multipart field `file` (extension required; `application/octet-stream` allowed). Response `{ text }`. Max 25 MiB. Audio is not stored. Timeout `remoteTranscribeTimeout` (60s). Mic → prompt only (#21); audio attachments are a separate flow |
+| POST | `/transcribe` | Bearer JWT. Multipart field `file` (extension required; `application/octet-stream` allowed). Response `{ text }`. Max 25 MiB. Audio is not stored. Timeout `remoteTranscribeTimeout` (60s). Client allowlist in `supportedAudioExtensions` (includes `.opus`; Local Whisper remaps `.opus` → `.ogg`). Mic → prompt only (#21); audio attachments are a separate flow |
 | GET | `/message-history` | Optional `thread_id`; `{ thread_id, messages: [{role,content}] }` |
 | POST | `/reset-session` | Optional `{ thread_id }` |
 | GET | `/individual-cache-status` | `{ exists }` for JWT `real_name` |
