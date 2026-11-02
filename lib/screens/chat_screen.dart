@@ -21,10 +21,15 @@ import '../data/secure_store.dart';
 import '../domain/models/jarvis_mode.dart';
 import '../widgets/attachment_sheets.dart';
 import '../widgets/chat_composer.dart';
+import '../widgets/chat_list_scroll.dart';
 import '../widgets/chat_message_bubble.dart';
 import 'login_screen.dart';
 import 'session_manager_screen.dart';
 import 'settings_screen.dart';
+
+/// Newest messages sit at the visual bottom; reverse keeps that end anchored
+/// when the keyboard inset resizes the list.
+const bool _chatListReverse = true;
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -33,7 +38,7 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final _chat = ChatController();
   final _input = TextEditingController();
   final _focusNode = FocusNode();
@@ -49,6 +54,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _preparingSend = false;
   int _attachmentSeq = 0;
   String? _apiBaseUrl;
+  double _lastBottomInset = 0;
 
   void _rebuild() {
     if (mounted) setState(() {});
@@ -69,6 +75,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _mic = ComposerMicController(
       session: RecordMicSession(),
       transcriber: PromptTranscriber(
@@ -85,11 +92,7 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mounted) setState(() {});
       },
     );
-    _scrollController.addListener(() {
-      final max = _scrollController.position.maxScrollExtent;
-      final current = _scrollController.position.pixels;
-      _wasAtBottom = (max - current).abs() < 50;
-    });
+    _scrollController.addListener(_onChatScroll);
     _focusNode.addListener(() {
       if (_focusNode.hasFocus && _wasAtBottom) {
         _scrollToBottom();
@@ -99,9 +102,45 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) setState(() {});
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _lastBottomInset = _viewInsetsBottom();
       _chat.bootstrap(onUpdate: _rebuild);
       unawaited(_loadApiBaseUrl());
       unawaited(_recoverLostCapture());
+    });
+  }
+
+  void _onChatScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    _wasAtBottom = isChatNearBottom(
+      pixels: position.pixels,
+      maxScrollExtent: position.maxScrollExtent,
+      reverse: _chatListReverse,
+    );
+  }
+
+  double _viewInsetsBottom() {
+    final views = WidgetsBinding.instance.platformDispatcher.views;
+    if (views.isEmpty) return 0;
+    final view = views.first;
+    return view.viewInsets.bottom / view.devicePixelRatio;
+  }
+
+  @override
+  void didChangeMetrics() {
+    final nextInset = _viewInsetsBottom();
+    final previousInset = _lastBottomInset;
+    _lastBottomInset = nextInset;
+    if (!shouldKeepBottomAnchorOnKeyboard(
+      wasAtBottom: _wasAtBottom,
+      previousBottomInset: previousInset,
+      nextBottomInset: nextInset,
+    )) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _scrollToBottom(animate: false);
     });
   }
 
@@ -113,22 +152,32 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _micTicker?.cancel();
     unawaited(_mic.dispose());
+    _scrollController.removeListener(_onChatScroll);
     _scrollController.dispose();
     _focusNode.dispose();
     _input.dispose();
     super.dispose();
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool animate = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
+      final target = chatBottomScrollOffset(
+        maxScrollExtent: _scrollController.position.maxScrollExtent,
+        reverse: _chatListReverse,
       );
+      if (animate) {
+        _scrollController.animateTo(
+          target,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      } else {
+        _scrollController.jumpTo(target);
+      }
     });
   }
 
@@ -593,10 +642,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 Expanded(
                   child: ListView.builder(
                     controller: _scrollController,
+                    reverse: _chatListReverse,
                     padding: const EdgeInsets.all(8),
                     itemCount: _chat.messages.length,
                     itemBuilder: (context, index) {
-                      final m = _chat.messages[index];
+                      // reverse:true paints index 0 at the visual bottom.
+                      final m = _chat.messages[
+                          _chat.messages.length - 1 - index];
                       return ChatMessageBubble(
                         text: m.text,
                         isUser: m.isUser,

@@ -8,6 +8,9 @@ const composerMicKey = Key('composer_mic');
 const composerAttachKey = Key('composer_attach');
 const composerCameraKey = Key('composer_camera');
 
+/// Soft cap on visible draft lines; overflow scrolls inside the field.
+const int composerMaxLines = 5;
+
 /// Chat input, or the record / transcribe bar that replaces it.
 class ChatComposer extends StatelessWidget {
   const ChatComposer({
@@ -194,11 +197,14 @@ class _IdleComposer extends StatelessWidget {
         ),
         Expanded(
           child: TextField(
+            key: const Key('composer_input'),
             controller: controller,
             focusNode: focusNode,
             textCapitalization: TextCapitalization.sentences,
             keyboardType: TextInputType.multiline,
-            maxLines: null,
+            textInputAction: TextInputAction.newline,
+            minLines: 1,
+            maxLines: composerMaxLines,
             enabled: inputEnabled,
             decoration: const InputDecoration(
               hintText: 'Type a message...',
