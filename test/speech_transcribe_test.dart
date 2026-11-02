@@ -120,6 +120,26 @@ void main() {
         ),
       );
     });
+
+    test('accepts .opus (WhatsApp-style) case-insensitively', () {
+      expect(
+        () => validateAudioPayload(sizeBytes: 4, filename: 'wa-note.opus'),
+        returnsNormally,
+      );
+      expect(
+        () => validateAudioPayload(sizeBytes: 4, filename: 'wa-note.OPUS'),
+        returnsNormally,
+      );
+    });
+  });
+
+  group('whisperUploadFilename', () {
+    test('remaps .opus to .ogg and leaves other names alone', () {
+      expect(whisperUploadFilename('wa-note.opus'), 'wa-note.ogg');
+      expect(whisperUploadFilename(r'C:\tmp\WA-NOTE.OPUS'), 'WA-NOTE.ogg');
+      expect(whisperUploadFilename('clip.m4a'), 'clip.m4a');
+      expect(whisperUploadFilename('clip.ogg'), 'clip.ogg');
+    });
   });
 
   group('PromptTranscriber routing', () {
@@ -251,6 +271,28 @@ void main() {
         throwsA(isA<SpeechTranscriptionException>()),
       );
       expect(remote.calls, 0);
+    });
+
+    test('remote mode keeps .opus for Jarvis (no Whisper remap)', () async {
+      final remote = _Counting('from opus');
+      final transcriber = PromptTranscriber(
+        remote: remote,
+        localForKey: (_) => throw StateError('local whisper must not run'),
+      );
+
+      final text = await transcriber.transcribe(
+        bytes: clip,
+        filename: 'wa-note.opus',
+        context: const SpeechContext(
+          mode: JarvisMode.remote,
+          offlineActive: false,
+          openAiApiKey: null,
+        ),
+      );
+
+      expect(text, 'from opus');
+      expect(remote.calls, 1);
+      expect(remote.lastFilename, 'wa-note.opus');
     });
   });
 
@@ -417,6 +459,24 @@ void main() {
       expect(body, contains('name="file"'));
       expect(body, contains('filename="jarvis-mic-9.m4a"'));
       expect(body, isNot(contains('sk-test')));
+    });
+
+    test('remaps .opus to .ogg on the Whisper multipart filename', () async {
+      final requests = <http.Request>[];
+      final client = OpenAiWhisperClient(
+        apiKey: 'sk-test',
+        httpClient: MockClient((request) async {
+          requests.add(request);
+          return http.Response(jsonEncode({'text': 'ok'}), 200);
+        }),
+      );
+
+      await client.transcribe(bytes: clip, filename: 'wa-note.opus');
+
+      expect(requests, hasLength(1));
+      final body = latin1.decode(requests.single.bodyBytes);
+      expect(body, contains('filename="wa-note.ogg"'));
+      expect(body, isNot(contains('filename="wa-note.opus"')));
     });
 
     test('maps OpenAI 401 through the settings message', () async {

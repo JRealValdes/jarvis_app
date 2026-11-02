@@ -5,6 +5,7 @@ import 'package:http_parser/http_parser.dart';
 
 import '../../config/app_config.dart';
 import '../openai/openai_client.dart';
+import 'audio_payload.dart';
 import 'audio_transcriber.dart';
 
 /// On-device Whisper call using the Settings API key.
@@ -37,7 +38,7 @@ class OpenAiWhisperClient implements AudioTranscriber {
       http.MultipartFile.fromBytes(
         'file',
         bytes,
-        filename: filename,
+        filename: whisperUploadFilename(filename),
         contentType: MediaType('application', 'octet-stream'),
       ),
     );
