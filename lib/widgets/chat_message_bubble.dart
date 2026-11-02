@@ -5,6 +5,7 @@ import 'package:jarvis_app/agent/images/assistant_image_saver.dart';
 import 'package:jarvis_app/agent/images/assistant_image_url.dart';
 import 'package:jarvis_app/widgets/assistant_markdown_image.dart';
 import 'package:jarvis_app/widgets/assistant_markdown_styles.dart';
+import 'package:jarvis_app/widgets/markdown_external_link.dart';
 
 /// Chat bubble matching the existing app look.
 class ChatMessageBubble extends StatelessWidget {
@@ -15,6 +16,7 @@ class ChatMessageBubble extends StatelessWidget {
     this.apiBaseUrl,
     this.saveImage,
     this.imageProviderForUrl,
+    this.openLink,
     super.key,
   });
 
@@ -30,6 +32,9 @@ class ChatMessageBubble extends StatelessWidget {
 
   /// Override network images in tests (e.g. [MemoryImage]).
   final ImageProvider Function(String url)? imageProviderForUrl;
+
+  /// Override Markdown link opens (tests). Defaults to [openMarkdownExternalLink].
+  final Future<bool> Function(String? href)? openLink;
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +58,10 @@ class ChatMessageBubble extends StatelessWidget {
                 selectable: false,
                 styleSheet: assistantMarkdownStyleSheet(context),
                 sizedImageBuilder: _buildAssistantImage,
+                onTapLink: (text, href, title) {
+                  final opener = openLink ?? openMarkdownExternalLink;
+                  opener(href);
+                },
               ),
       ),
     );

@@ -99,4 +99,27 @@ Do the quick thing.
     expect(find.textContaining('Options'), findsWidgets);
     expect(find.textContaining('Fast path'), findsWidgets);
   });
+
+  testWidgets('assistant MarkdownBody wires onTapLink to openLink', (tester) async {
+    final opened = <String?>[];
+    await tester.pumpWidget(
+      wrap(
+        ChatMessageBubble(
+          text: 'See [docs](https://example.com/docs) for details.',
+          isUser: false,
+          openLink: (href) async {
+            opened.add(href);
+            return true;
+          },
+        ),
+      ),
+    );
+
+    final body = tester.widget<MarkdownBody>(find.byType(MarkdownBody));
+    expect(body.onTapLink, isNotNull);
+    body.onTapLink!('docs', 'https://example.com/docs', '');
+    await tester.pump();
+
+    expect(opened, ['https://example.com/docs']);
+  });
 }
