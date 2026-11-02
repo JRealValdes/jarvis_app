@@ -5,6 +5,7 @@ import 'package:jarvis_app/agent/images/assistant_image_saver.dart';
 import 'package:jarvis_app/agent/images/assistant_image_url.dart';
 import 'package:jarvis_app/widgets/assistant_markdown_image.dart';
 import 'package:jarvis_app/widgets/assistant_markdown_styles.dart';
+import 'package:jarvis_app/widgets/markdown_code_block.dart';
 import 'package:jarvis_app/widgets/markdown_external_link.dart';
 
 /// Chat bubble matching the existing app look.
@@ -17,6 +18,7 @@ class ChatMessageBubble extends StatelessWidget {
     this.saveImage,
     this.imageProviderForUrl,
     this.openLink,
+    this.copyToClipboard,
     super.key,
   });
 
@@ -35,6 +37,10 @@ class ChatMessageBubble extends StatelessWidget {
 
   /// Override Markdown link opens (tests). Defaults to [openMarkdownExternalLink].
   final Future<bool> Function(String? href)? openLink;
+
+  /// Override fenced-code clipboard writes (tests).
+  /// Defaults to [copyMarkdownCodeToClipboard].
+  final Future<void> Function(String text)? copyToClipboard;
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +64,11 @@ class ChatMessageBubble extends StatelessWidget {
                 selectable: false,
                 styleSheet: assistantMarkdownStyleSheet(context),
                 sizedImageBuilder: _buildAssistantImage,
+                builders: <String, MarkdownElementBuilder>{
+                  'pre': MarkdownFencedCodeBlockBuilder(
+                    copyToClipboard: copyToClipboard,
+                  ),
+                },
                 onTapLink: (text, href, title) {
                   final opener = openLink ?? openMarkdownExternalLink;
                   opener(href);
