@@ -18,9 +18,9 @@ pluginManagement {
 
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
-    // Aligned with Flutter 3.47 verified Android toolchain (pre-AGP-9 path).
-    id("com.android.application") version "8.11.1" apply false
-    id("org.jetbrains.kotlin.android") version "2.2.20" apply false
+    // Aligned with Flutter 3.50 template / warn versions (Gradle ≥ 9.3.1 required).
+    id("com.android.application") version "9.3.1" apply false
+    id("org.jetbrains.kotlin.android") version "2.4.20" apply false
 }
 
 include(":app")

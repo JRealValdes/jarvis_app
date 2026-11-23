@@ -93,16 +93,18 @@ Chrome DevTools device mode (`flutter run -d chrome`) is useful for quick UI wid
 
 ## Android Gradle toolchain (repo)
 
-Aligned with Flutter 3.47’s pre-AGP-9 path:
+Aligned with Flutter 3.50 template / warn versions (CI `channel: stable`):
 
 | Tool | Version in repo |
 |------|-----------------|
-| Gradle wrapper | 8.14 |
-| Android Gradle Plugin | 8.11.1 |
-| Kotlin | 2.2.20 |
+| Gradle wrapper | 9.5.0 |
+| Android Gradle Plugin | 9.3.1 |
+| Kotlin | 2.4.20 |
+| Java / JVM target | 17 |
+| Android NDK | 28.2.13676358 (matches plugin requirements) |
 | `minSdk` / `targetSdk` / `compileSdk` | Flutter defaults (`flutter.*SdkVersion`) |
 
-`android/gradle.properties` keeps `android.builtInKotlin=false` and `android.newDsl=false` until a full AGP 9 migration.
+`android/gradle.properties` keeps `android.newDsl=false` (legacy AGP DSL) and uses AGP Built-in Kotlin (no `kotlin-android` on the app module). Plugins such as `file_picker` skip KGP under AGP 9 and need Built-in Kotlin to compile.
 
 ## CI sideload APK (issues #24 / #40)
 
