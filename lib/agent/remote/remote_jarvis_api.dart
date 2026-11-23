@@ -7,6 +7,7 @@ import 'package:http_parser/http_parser.dart';
 
 import '../../config/app_config.dart';
 import '../../domain/chat_image.dart';
+import '../../domain/models/chat_job.dart';
 import '../../domain/models/chat_turn.dart';
 import '../../domain/models/periodic_task.dart';
 import '../jarvis_backend.dart';
@@ -470,6 +471,72 @@ class RemoteJarvisApi implements JarvisBackend, JarvisAdminBackend {
     }
     final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
     return PeriodicTaskRun.fromJson(Map<String, dynamic>.from(decoded as Map));
+  }
+
+  /// `POST /devices/register`
+  Future<void> registerDeviceToken({
+    required String token,
+    required String platform,
+  }) async {
+    final resp = await _post(
+      '/devices/register',
+      body: {'token': token, 'platform': platform},
+    );
+    _ensureOk(resp, 'Register device');
+  }
+
+  /// `POST /devices/unregister`
+  Future<void> unregisterDeviceToken(String token) async {
+    final resp = await _post(
+      '/devices/unregister',
+      body: {'token': token},
+    );
+    _ensureOk(resp, 'Unregister device');
+  }
+
+  /// `POST /ask-async` — returns a pollable job id.
+  Future<ChatJob> askAsync(
+    String message, {
+    required String modelName,
+    List<ChatImage> images = const [],
+    String? threadId,
+  }) async {
+    final body = <String, dynamic>{
+      'message': message,
+      'model_name': modelName,
+    };
+    if (threadId != null && threadId.isNotEmpty) {
+      body['thread_id'] = threadId;
+    }
+    if (images.isNotEmpty) {
+      body['images'] = [for (final image in images) image.toAskJson()];
+    }
+    final resp = await _post('/ask-async', body: body);
+    if (resp.statusCode != 200) {
+      final detail = readFastApiDetail(resp);
+      throw JarvisRemoteException(
+        detail ?? 'Async ask failed: ${resp.statusCode}',
+        statusCode: resp.statusCode,
+        kind: kindFromStatusCode(resp.statusCode),
+      );
+    }
+    final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
+    return ChatJob.fromJson(Map<String, dynamic>.from(decoded as Map));
+  }
+
+  /// `GET /jobs/{id}`
+  Future<ChatJob> getJob(String jobId) async {
+    final resp = await _get('/jobs/$jobId');
+    if (resp.statusCode != 200) {
+      final detail = readFastApiDetail(resp);
+      throw JarvisRemoteException(
+        detail ?? 'Get job failed: ${resp.statusCode}',
+        statusCode: resp.statusCode,
+        kind: kindFromStatusCode(resp.statusCode),
+      );
+    }
+    final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
+    return ChatJob.fromJson(Map<String, dynamic>.from(decoded as Map));
   }
 }
 
