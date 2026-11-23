@@ -104,7 +104,9 @@ Aligned with Flutter 3.50 template / warn versions (CI `channel: stable`):
 | Android NDK | 28.2.13676358 (matches plugin requirements) |
 | `minSdk` / `targetSdk` / `compileSdk` | Flutter defaults (`flutter.*SdkVersion`) |
 
-`android/gradle.properties` keeps `android.newDsl=false` (legacy AGP DSL) and uses AGP Built-in Kotlin (no `kotlin-android` on the app module). Plugins such as `file_picker` skip KGP under AGP 9 and need Built-in Kotlin to compile.
+`android/gradle.properties` keeps `android.newDsl=false` (legacy AGP DSL) and sets `android.builtInKotlin=true` explicitly (no `kotlin-android` on the app module). If that property is omitted, Flutter’s migrator appends `android.builtInKotlin=false` on build, which breaks plugins such as `file_picker` that skip KGP under AGP 9 and need Built-in Kotlin.
+
+Release builds set `lint { checkReleaseBuilds = false }` in `android/app/build.gradle.kts` so AGP 9 `lintVital` crashes inside dependencies (e.g. `image_picker_android`) do not block sideload APKs.
 
 ## CI sideload APK (issues #24 / #40)
 
