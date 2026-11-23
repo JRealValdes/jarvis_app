@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
+import 'dart:math';
+
 import '../agent/backend_factory.dart';
+import '../agent/remote/auth_service.dart';
 import '../agent/remote/endpoint.dart';
 import '../app.dart';
 import '../data/secure_store.dart';
 import '../domain/models/jarvis_mode.dart';
-import '../agent/remote/auth_service.dart';
+import '../push/push_service.dart';
 import '../widgets/local_setup_form.dart';
 import 'login_screen.dart';
 import 'tasks_screen.dart';
@@ -21,9 +24,11 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final _store = SecureStore();
   final _auth = AuthService();
+  final _push = PushService();
   final _baseUrlCtrl = TextEditingController();
   JarvisMode _mode = JarvisMode.auto;
   String? _username;
+  String? _pushToken;
   bool _loading = true;
 
   @override
@@ -42,13 +47,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final mode = await _store.getMode();
     final user = await _store.getUsername();
     final baseUrl = await _store.getApiBaseUrl();
+    final pushToken = await _store.getPushDeviceToken();
     if (!mounted) return;
     setState(() {
       _mode = mode;
       _username = user;
+      _pushToken = pushToken;
       if (baseUrl != null) _baseUrlCtrl.text = baseUrl;
       _loading = false;
     });
+  }
+
+  Future<void> _registerTestPushToken() async {
+    final token =
+        'test-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(1 << 20)}';
+    try {
+      await _push.registerToken(token);
+      if (!mounted) return;
+      setState(() => _pushToken = token);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Device token registered with Jarvis.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Push registration failed: $e')),
+      );
+    }
+  }
+
+  Future<void> _unregisterPushToken() async {
+    try {
+      await _push.unregisterSavedToken();
+      if (!mounted) return;
+      setState(() => _pushToken = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Device token removed.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unregister failed: $e')),
+      );
+    }
   }
 
   Future<void> _saveBaseUrl() async {
@@ -306,6 +347,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   MaterialPageRoute(builder: (_) => const TasksScreen()),
                 );
               },
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Text(
+                'Notifications',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            ListTile(
+              title: Text(
+                _pushToken == null
+                    ? 'No device token registered'
+                    : 'Token registered',
+              ),
+              subtitle: Text(
+                _pushToken == null
+                    ? 'Register a token so Jarvis can notify you when a '
+                        'task or background reply finishes. FCM project '
+                        'wiring can replace this test token later.'
+                    : _pushToken!,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.notifications_active_outlined),
+              title: const Text('Register test device token'),
+              onTap: _registerTestPushToken,
+            ),
+            ListTile(
+              leading: const Icon(Icons.notifications_off_outlined),
+              title: const Text('Unregister device token'),
+              onTap: _pushToken == null ? null : _unregisterPushToken,
             ),
           ],
           const Divider(),

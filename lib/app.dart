@@ -1,21 +1,23 @@
 import 'package:flutter/material.dart';
 
+import 'agent/remote/auth_service.dart';
 import 'data/local_credentials.dart';
 import 'data/secure_store.dart';
 import 'domain/models/jarvis_mode.dart';
+import 'navigation/app_navigator.dart';
 import 'screens/chat_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/setup_screen.dart';
-import 'agent/remote/auth_service.dart';
 
 class JarvisApp extends StatelessWidget {
   const JarvisApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       title: 'Jarvis App',
-      home: JarvisBootGate(),
+      navigatorKey: appNavigatorKey,
+      home: const JarvisBootGate(),
     );
   }
 }
