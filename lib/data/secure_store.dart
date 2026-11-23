@@ -21,6 +21,7 @@ class SecureStore {
   static const _keyUsername = 'username';
   static const _keyPassword = 'password';
   static const _keyApiBaseUrl = 'api_base_url';
+  static const _keyPushDeviceToken = 'push_device_token';
 
   Future<JarvisMode> getMode() async {
     final value = await _storage.read(key: _keyMode);
@@ -120,5 +121,16 @@ class SecureStore {
 
   Future<void> clearApiBaseUrl() async {
     await _storage.delete(key: _keyApiBaseUrl);
+  }
+
+  Future<String?> getPushDeviceToken() =>
+      _storage.read(key: _keyPushDeviceToken);
+
+  Future<void> setPushDeviceToken(String token) async {
+    await _storage.write(key: _keyPushDeviceToken, value: token.trim());
+  }
+
+  Future<void> clearPushDeviceToken() async {
+    await _storage.delete(key: _keyPushDeviceToken);
   }
 }
