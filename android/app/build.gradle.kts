@@ -60,6 +60,12 @@ android {
             }
         }
     }
+
+    // AGP 9 lintVital can crash inside dependency modules (e.g. image_picker_android
+    // CommentDetector / List.removeLast). Sideload CI only needs assembleRelease.
+    lint {
+        checkReleaseBuilds = false
+    }
 }
 
 kotlin {
