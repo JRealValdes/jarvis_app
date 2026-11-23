@@ -26,6 +26,7 @@ import '../widgets/chat_message_bubble.dart';
 import 'login_screen.dart';
 import 'session_manager_screen.dart';
 import 'settings_screen.dart';
+import 'tasks_screen.dart';
 
 /// Newest messages sit at the visual bottom; reverse keeps that end anchored
 /// when the keyboard inset resizes the list.
@@ -524,6 +525,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         title: Text(_title),
         automaticallyImplyLeading: false,
         actions: [
+          if (_showRemoteLogout)
+            IconButton(
+              icon: const Icon(Icons.event_repeat),
+              tooltip: 'Periodic tasks',
+              onPressed: () async {
+                await _abandonMic();
+                if (!context.mounted) return;
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TasksScreen()),
+                );
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.settings),
             tooltip: 'Settings',

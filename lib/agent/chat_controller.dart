@@ -50,6 +50,9 @@ class ChatController {
     SecureStore? secureStore,
     AuthService? auth,
     Duration? askSoftWait,
+    this.threadId,
+    this.isTaskChat = false,
+    this.resetBanner,
   })  : _secureStore = secureStore ?? SecureStore(),
         _auth = auth ?? AuthService(),
         _askSoftWait = askSoftWait ?? AppConfig.remoteAskSoftWait {
@@ -61,6 +64,15 @@ class ChatController {
           },
         );
   }
+
+  /// Non-main thread (e.g. `task:{id}`). Null uses the backend default.
+  final String? threadId;
+
+  /// Ephemeral periodic-task chat: no manual reset / welcome seed.
+  final bool isTaskChat;
+
+  /// Banner copy shown above a task chat (next reset time).
+  final String? resetBanner;
 
   late final BackendFactory _factory;
   final SecureStore _secureStore;
@@ -172,6 +184,7 @@ class ChatController {
         payload,
         modelName: modelName,
         images: _pendingImages,
+        threadId: threadId,
       );
       for (final msg in responses) {
         messages.add(ChatBubble(text: msg, isUser: false));
@@ -198,13 +211,33 @@ class ChatController {
     onUpdate?.call();
 
     try {
-      final history = await backend.getMessageHistory();
+      final history = await backend.getMessageHistory(threadId: threadId);
       _syncOfflineFlag();
+
+      if (isTaskChat) {
+        for (final msg in history) {
+          if (msg.isSystem) continue;
+          messages.add(ChatBubble(text: msg.content, isUser: msg.isUser));
+        }
+        if (messages.isEmpty) {
+          messages.add(
+            const ChatBubble(
+              text: 'This task has not produced a report yet. '
+                  'Wait for the next scheduled run or trigger Run now.',
+              isUser: false,
+            ),
+          );
+        }
+        loading = false;
+        onUpdate?.call();
+        return;
+      }
+
       final cacheExists = await backend.individualCacheExists();
 
       if (history.isEmpty) {
         if (cacheExists) {
-          await backend.resetSession();
+          await backend.resetSession(threadId: threadId);
         }
         loading = false;
         onUpdate?.call();
@@ -237,6 +270,11 @@ class ChatController {
       }
       loading = false;
       onUpdate?.call();
+      if (isTaskChat) {
+        messages.add(ChatBubble(text: 'Failed to load task chat: $e', isUser: false));
+        onUpdate?.call();
+        return;
+      }
       await send(initial: true, onUpdate: onUpdate);
     }
   }
@@ -259,9 +297,10 @@ class ChatController {
 
     late final String payload;
     if (initial) {
+      if (isTaskChat) return;
       payload = AppConfig.seedUserMessage;
       try {
-        await backend.resetSession();
+        await backend.resetSession(threadId: threadId);
       } on OfflineKeyRequiredException catch (e) {
         needsOfflineKey = true;
         messages.add(ChatBubble(text: e.message, isUser: false));
@@ -328,6 +367,7 @@ class ChatController {
         payload,
         modelName: _modelForAsk(images),
         images: images,
+        threadId: threadId,
       );
       if (gen != _askGeneration) return;
       _syncOfflineFlag();
@@ -375,11 +415,12 @@ class ChatController {
   }
 
   Future<void> resetChat({void Function()? onUpdate}) async {
+    if (isTaskChat) return;
     final backend = _backend;
     if (backend == null) return;
     _askGeneration++;
     _clearSlowOffer();
-    await backend.resetSession();
+    await backend.resetSession(threadId: threadId);
     messages.clear();
     onUpdate?.call();
     await send(initial: true, onUpdate: onUpdate);

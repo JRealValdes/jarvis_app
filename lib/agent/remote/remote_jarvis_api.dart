@@ -8,6 +8,7 @@ import 'package:http_parser/http_parser.dart';
 import '../../config/app_config.dart';
 import '../../domain/chat_image.dart';
 import '../../domain/models/chat_turn.dart';
+import '../../domain/models/periodic_task.dart';
 import '../jarvis_backend.dart';
 import 'auth_service.dart';
 import 'endpoint.dart';
@@ -75,6 +76,47 @@ class RemoteJarvisApi implements JarvisBackend, JarvisAdminBackend {
       },
       label: 'POST $path',
       primaryTimeout: timeoutOverride,
+    );
+  }
+
+  Future<http.Response> _patch(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    return _withBases(
+      (base, timeout) async {
+        final token = await _auth.getToken();
+        return _http
+            .patch(
+              Uri.parse('$base$path'),
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Content-Type': 'application/json; charset=utf-8',
+                'Accept': 'application/json',
+              },
+              body: body != null ? json.encode(body) : null,
+            )
+            .timeout(timeout);
+      },
+      label: 'PATCH $path',
+    );
+  }
+
+  Future<http.Response> _delete(String path) async {
+    return _withBases(
+      (base, timeout) async {
+        final token = await _auth.getToken();
+        return _http
+            .delete(
+              Uri.parse('$base$path'),
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Accept': 'application/json',
+              },
+            )
+            .timeout(timeout);
+      },
+      label: 'DELETE $path',
     );
   }
 
@@ -234,11 +276,15 @@ class RemoteJarvisApi implements JarvisBackend, JarvisAdminBackend {
     String message, {
     required String modelName,
     List<ChatImage> images = const [],
+    String? threadId,
   }) async {
     final body = <String, dynamic>{
       'message': message,
       'model_name': modelName,
     };
+    if (threadId != null && threadId.isNotEmpty) {
+      body['thread_id'] = threadId;
+    }
     if (images.isNotEmpty) {
       body['images'] = [for (final image in images) image.toAskJson()];
     }
@@ -305,6 +351,125 @@ class RemoteJarvisApi implements JarvisBackend, JarvisAdminBackend {
   Future<void> resetGlobalMemory() async {
     final resp = await _post('/admin/reset-global-memory');
     _ensureOk(resp, 'Global reset');
+  }
+
+  /// `GET /tasks`
+  Future<List<PeriodicTask>> listTasks() async {
+    final resp = await _get('/tasks');
+    _ensureOk(resp, 'List tasks');
+    final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
+    final items = decoded['tasks'] as List<dynamic>? ?? [];
+    return items
+        .map((e) => PeriodicTask.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  /// `GET /tasks/{id}`
+  Future<PeriodicTask> getTask(String taskId) async {
+    final resp = await _get('/tasks/$taskId');
+    if (resp.statusCode != 200) {
+      final detail = readFastApiDetail(resp);
+      throw JarvisRemoteException(
+        detail ?? 'Get task failed: ${resp.statusCode}',
+        statusCode: resp.statusCode,
+        kind: kindFromStatusCode(resp.statusCode),
+      );
+    }
+    final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
+    return PeriodicTask.fromJson(Map<String, dynamic>.from(decoded as Map));
+  }
+
+  /// `POST /tasks`
+  Future<PeriodicTask> createTask({
+    required String title,
+    required String instruction,
+    required List<dynamic> daysOfWeek,
+    required String time,
+    String timezone = 'Europe/Madrid',
+    String notifyPolicy = 'always',
+    bool enabled = true,
+  }) async {
+    final resp = await _post(
+      '/tasks',
+      body: {
+        'title': title,
+        'instruction': instruction,
+        'schedule': {'days_of_week': daysOfWeek, 'time': time},
+        'timezone': timezone,
+        'notify_policy': notifyPolicy,
+        'enabled': enabled,
+      },
+    );
+    if (resp.statusCode != 200) {
+      final detail = readFastApiDetail(resp);
+      throw JarvisRemoteException(
+        detail ?? 'Create task failed: ${resp.statusCode}',
+        statusCode: resp.statusCode,
+        kind: kindFromStatusCode(resp.statusCode),
+      );
+    }
+    final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
+    return PeriodicTask.fromJson(Map<String, dynamic>.from(decoded as Map));
+  }
+
+  /// `PATCH /tasks/{id}`
+  Future<PeriodicTask> updateTask(
+    String taskId, {
+    String? title,
+    String? instruction,
+    List<dynamic>? daysOfWeek,
+    String? time,
+    String? timezone,
+    String? notifyPolicy,
+    bool? enabled,
+  }) async {
+    final body = <String, dynamic>{};
+    if (title != null) body['title'] = title;
+    if (instruction != null) body['instruction'] = instruction;
+    if (timezone != null) body['timezone'] = timezone;
+    if (notifyPolicy != null) body['notify_policy'] = notifyPolicy;
+    if (enabled != null) body['enabled'] = enabled;
+    if (daysOfWeek != null || time != null) {
+      body['schedule'] = {
+        if (daysOfWeek != null) 'days_of_week': daysOfWeek,
+        if (time != null) 'time': time,
+      };
+    }
+    final resp = await _patch('/tasks/$taskId', body: body);
+    if (resp.statusCode != 200) {
+      final detail = readFastApiDetail(resp);
+      throw JarvisRemoteException(
+        detail ?? 'Update task failed: ${resp.statusCode}',
+        statusCode: resp.statusCode,
+        kind: kindFromStatusCode(resp.statusCode),
+      );
+    }
+    final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
+    return PeriodicTask.fromJson(Map<String, dynamic>.from(decoded as Map));
+  }
+
+  /// `DELETE /tasks/{id}`
+  Future<void> deleteTask(String taskId) async {
+    final resp = await _delete('/tasks/$taskId');
+    _ensureOk(resp, 'Delete task');
+  }
+
+  /// `POST /tasks/{id}/run`
+  Future<PeriodicTaskRun> runTaskNow(String taskId) async {
+    final resp = await _post(
+      '/tasks/$taskId/run',
+      timeoutOverride: _askTimeout,
+    );
+    if (resp.statusCode != 200) {
+      final detail = readFastApiDetail(resp);
+      throw JarvisRemoteException(
+        detail ?? 'Run task failed: ${resp.statusCode}',
+        statusCode: resp.statusCode,
+        kind: kindFromStatusCode(resp.statusCode),
+      );
+    }
+    final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
+    return PeriodicTaskRun.fromJson(Map<String, dynamic>.from(decoded as Map));
   }
 }
 

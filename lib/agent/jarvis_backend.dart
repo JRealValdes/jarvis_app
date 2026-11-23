@@ -5,10 +5,12 @@ import '../domain/models/chat_turn.dart';
 abstract class JarvisBackend {
   /// [images] is sent on the same turn as [message]. Empty means a text ask.
   /// [message] may be empty when [images] is not.
+  /// [threadId] targets a non-main conversation (e.g. periodic task chat).
   Future<List<String>> ask(
     String message, {
     required String modelName,
     List<ChatImage> images = const [],
+    String? threadId,
   });
 
   Future<List<ChatTurn>> getMessageHistory({String? threadId});

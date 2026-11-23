@@ -39,7 +39,9 @@ class LocalJarvisAgent implements JarvisBackend {
     String message, {
     required String modelName,
     List<ChatImage> images = const [],
+    String? threadId,
   }) async {
+    // Local mode has a single on-device thread; [threadId] is ignored.
     final session = await _ensureSession(modelName: modelName);
     final replies = await session.ask(message, images: images);
 

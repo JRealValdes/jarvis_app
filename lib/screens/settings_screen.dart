@@ -8,6 +8,7 @@ import '../domain/models/jarvis_mode.dart';
 import '../agent/remote/auth_service.dart';
 import '../widgets/local_setup_form.dart';
 import 'login_screen.dart';
+import 'tasks_screen.dart';
 
 /// Control plane: execution mode, local credentials, remote session.
 class SettingsScreen extends StatefulWidget {
@@ -293,6 +294,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               leading: const Icon(Icons.logout),
               title: const Text('Log out remote'),
               onTap: _logoutRemote,
+            ),
+            ListTile(
+              leading: const Icon(Icons.event_repeat),
+              title: const Text('Periodic tasks'),
+              subtitle: const Text(
+                'Scheduled searches and ephemeral task chats',
+              ),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TasksScreen()),
+                );
+              },
             ),
           ],
           const Divider(),
