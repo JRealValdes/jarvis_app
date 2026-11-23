@@ -87,6 +87,7 @@ class FailoverJarvisBackend implements JarvisBackend {
     String message, {
     required String modelName,
     List<ChatImage> images = const [],
+    String? threadId,
   }) {
     return _remoteOrOffline(
       remoteOp: () async {
@@ -94,11 +95,17 @@ class FailoverJarvisBackend implements JarvisBackend {
           message,
           modelName: modelName,
           images: images,
+          threadId: threadId,
         );
         _skipWelcomeOnCutover = true;
         return replies;
       },
-      offlineOp: (o) => o.ask(message, modelName: modelName, images: images),
+      offlineOp: (o) => o.ask(
+        message,
+        modelName: modelName,
+        images: images,
+        threadId: threadId,
+      ),
     );
   }
 
